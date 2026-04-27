@@ -27,6 +27,14 @@ def _model_ids(result: dict[str, Any]) -> list[str]:
         return [item for item in model_ids if isinstance(item, str)]
 
     models = result.get("models")
+    if not isinstance(models, list):
+        config = result.get("config")
+        if isinstance(config, dict):
+            models = config.get("models")
+    if not isinstance(models, list):
+        metadata = result.get("model_metadata")
+        if isinstance(metadata, list):
+            models = metadata
     if isinstance(models, list):
         extracted: list[str] = []
         for model in models:
@@ -57,8 +65,10 @@ def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
         "signer": _signer(bundle.manifest),
         "model_ids": _model_ids(result),
         "judge_mode": result.get("judge_mode")
-        or _nested_string(result, "judge", "mode"),
+        or _nested_string(result, "judge", "mode")
+        or _nested_string(result, "config", "judge", "mode"),
         "config_hash": result.get("config_hash")
+        or _nested_string(result, "provenance", "config_hash")
         or _nested_string(result, "config", "hash")
         or _nested_string(result, "config", "sha256"),
         "bundle_path": bundle.path.as_posix(),

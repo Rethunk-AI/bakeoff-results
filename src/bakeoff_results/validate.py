@@ -110,6 +110,14 @@ def _model_ids(result: dict[str, Any]) -> list[str]:
         return model_ids
 
     models = result.get("models")
+    if not isinstance(models, list):
+        config = result.get("config")
+        if isinstance(config, dict):
+            models = config.get("models")
+    if not isinstance(models, list):
+        metadata = result.get("model_metadata")
+        if isinstance(metadata, list):
+            models = metadata
     if isinstance(models, list):
         extracted: list[str] = []
         for model in models:
@@ -132,12 +140,23 @@ def validate_result(result: dict[str, Any]) -> None:
     provenance = result.get("provenance")
     if not isinstance(provenance, dict):
         raise BundleValidationError("result requires provenance object")
-    if not any(isinstance(provenance.get(field), str) and provenance.get(field) for field in ("source_repository", "repository")):
+    has_repository = any(
+        isinstance(provenance.get(field), str) and provenance.get(field)
+        for field in ("source_repository", "repository")
+    )
+    # Current bakeoff payloads capture the commit under provenance.git.sha.
+    # Repository identity is implied by the result bundle source and signer.
+    git = provenance.get("git")
+    has_git_sha = isinstance(git, dict) and isinstance(git.get("sha"), str) and bool(git["sha"])
+    if not has_repository and not has_git_sha:
         raise BundleValidationError(
-            "result provenance requires source_repository or repository"
+            "result provenance requires source_repository, repository, or git.sha"
         )
-    if not any(isinstance(provenance.get(field), str) and provenance.get(field) for field in ("source_commit", "commit")):
-        raise BundleValidationError("result provenance requires source_commit or commit")
+    if not has_git_sha and not any(
+        isinstance(provenance.get(field), str) and provenance.get(field)
+        for field in ("source_commit", "commit")
+    ):
+        raise BundleValidationError("result provenance requires source_commit, commit, or git.sha")
 
     _model_ids(result)
 

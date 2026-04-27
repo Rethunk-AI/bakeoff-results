@@ -69,6 +69,72 @@ def make_bundle(root: Path, *, include_required_result_fields: bool = True) -> P
     return bundle
 
 
+def make_bakeoff_bundle(root: Path) -> Path:
+    bundle = root / "publisher" / "test-run"
+    bundle.mkdir(parents=True)
+
+    result = {
+        "run_id": "test-run",
+        "timestamp": "20260427-010000",
+        "config": {
+            "models": [{"id": "m_a", "gguf": "org/repo/model-Q4_K_M.gguf"}],
+            "prompts": [{"id": "plain", "system": "Answer."}],
+            "judge": {"enabled": True, "mode": "pairwise_all"},
+        },
+        "provenance": {
+            "config_hash": "abc123",
+            "seed": 42,
+            "git": {"sha": "deadbee", "branch": "main", "dirty": False},
+        },
+        "model_metadata": [
+            {"id": "m_a", "gguf": "org/repo/model-Q4_K_M.gguf", "repo_id": "org/repo"},
+        ],
+        "tasks": [{"id": "t1", "domain": "qa", "user_prompt": "Question?"}],
+        "records": [
+            {
+                "task_id": "t1",
+                "prompt_id": "plain",
+                "model_id": "m_a",
+                "text": "Answer",
+                "latency_s": 1.0,
+                "ttft_s": 0.1,
+                "tokens_per_sec": 12.0,
+                "energy_wh": None,
+                "cost_usd": None,
+                "quality_heuristic": 1.0,
+                "error": None,
+            }
+        ],
+        "judgements": [],
+    }
+    write_json(bundle / "result.json", result)
+    (bundle / "summary.md").write_text("# Summary\n\nFixture result.\n", encoding="utf-8")
+    (bundle / "dashboard.html").write_text("<h1>Fixture</h1>\n", encoding="utf-8")
+
+    manifest = {
+        "schema_version": "bakeoff-results/v1",
+        "created_at": "2026-04-26T00:00:00Z",
+        "run_id": "test-run",
+        "timestamp": "20260427-010000",
+        "config_hash": "abc123",
+        "judge_mode": "pairwise_all",
+        "model_ids": ["m_a"],
+        "files": {
+            "result.json": {"sha256": digest(bundle / "result.json")},
+            "summary.md": {"sha256": digest(bundle / "summary.md")},
+            "dashboard.html": {"sha256": digest(bundle / "dashboard.html")},
+        },
+        "signature": {
+            "kind": "sigstore-bundle",
+            "path": None,
+            "signed_file": "result.json",
+            "required": False,
+        },
+    }
+    write_json(bundle / "manifest.json", manifest)
+    return bundle
+
+
 class BundleValidationTests(unittest.TestCase):
     def test_valid_bundle_passes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -94,6 +160,14 @@ class BundleValidationTests(unittest.TestCase):
             with self.assertRaisesRegex(BundleValidationError, "provenance"):
                 validate_bundle(bundle)
 
+    def test_current_bakeoff_bundle_shape_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = make_bakeoff_bundle(Path(tmp))
+
+            validated = validate_bundle(bundle)
+
+            self.assertEqual(validated.result["run_id"], "test-run")
+
 
 class IndexBuilderTests(unittest.TestCase):
     def test_index_outputs_json_and_html(self) -> None:
@@ -114,6 +188,18 @@ class IndexBuilderTests(unittest.TestCase):
                 "Rethunk Bakeoff Results",
                 (root / "site" / "index.html").read_text(encoding="utf-8"),
             )
+
+    def test_index_accepts_current_bakeoff_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_bakeoff_bundle(root / "submissions")
+
+            payload = build_index(root / "submissions", root / "site")
+
+            entry = payload["entries"][0]
+            self.assertEqual(entry["model_ids"], ["m_a"])
+            self.assertEqual(entry["judge_mode"], "pairwise_all")
+            self.assertEqual(entry["config_hash"], "abc123")
 
 
 if __name__ == "__main__":
