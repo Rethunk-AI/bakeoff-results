@@ -1,0 +1,11 @@
+schema_version: bakeoff-results-signers/v1
+trusted_repositories:
+  - repository: Rethunk-AI/bakeoff
+    issuer: https://token.actions.githubusercontent.com
+    subjects:
+      - repo:Rethunk-AI/bakeoff:ref:refs/heads/main
+    workflows:
+      - .github/workflows/package-results.yml
+trusted_identities:
+  - identity: github-actions[bot]
+    issuer: https://token.actions.githubusercontent.com
