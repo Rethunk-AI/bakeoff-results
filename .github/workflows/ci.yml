@@ -62,7 +62,7 @@ jobs:
         run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
 
       - name: Attest site artifacts
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             site/index.json
