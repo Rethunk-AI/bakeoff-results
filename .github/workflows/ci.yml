@@ -68,10 +68,19 @@ jobs:
             site/index.json
             site/index.html
 
+      - name: Enable Pages (public)
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pages" \
+            -f source[branch]=main \
+            -f source[path]=/site \
+            -f public=true \
+            || gh api --method PUT "repos/$GITHUB_REPOSITORY/pages" \
+            -f public=true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
