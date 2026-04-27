@@ -288,6 +288,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Exit successfully when --scan finds no bundles",
     )
+    parser.add_argument(
+        "--require-signature",
+        action="store_true",
+        help="Fail any bundle that lacks signature.sigstore.json",
+    )
     args = parser.parse_args(argv)
 
     targets = discover_bundles(args.paths) if args.scan else args.paths
@@ -300,6 +305,9 @@ def main(argv: list[str] | None = None) -> int:
 
     for target in targets:
         validate_bundle(target)
+        if args.require_signature and not (Path(target) / "signature.sigstore.json").exists():
+            print(f"UNSIGNED {target}", file=sys.stderr)
+            return 1
         print(f"OK {target}")
     return 0
 

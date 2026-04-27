@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Future artifact attestation jobs will need id-token: write and
-      # attestations: write once publication settings are approved.
 
     steps:
       - name: Check out repository
@@ -35,5 +33,49 @@ jobs:
       - name: Build static index
         run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
 
-      # Future GitHub Pages deployment can publish ./site after repository
-      # settings, environment protection, and approval policy are finalized.
+  publish:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      pages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate submissions (signature required)
+        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty --require-signature submissions
+
+      - name: Build static index
+        run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
+
+      - name: Attest site artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            site/index.json
+            site/index.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
