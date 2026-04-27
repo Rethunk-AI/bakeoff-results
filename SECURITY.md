@@ -1,0 +1,46 @@
+# Security Policy
+
+This repository is a results archive and publication pipeline. It accepts
+signed result bundles, validates them, generates a static leaderboard, and
+publishes via GitHub Pages. The threat surface is narrow but real: malicious
+bundles, validator bypass, and signer policy compromise.
+
+## Supported versions
+
+Only `main` is supported.
+
+## Reporting a vulnerability
+
+**Do not open a public issue** for security-sensitive findings. Report
+privately via GitHub's Security tab:
+
+<https://github.com/Rethunk-AI/bakeoff-results/security/advisories/new>
+
+Please include:
+
+- Affected commit SHA
+- Reproduction steps
+- Observed vs. expected behavior
+- Impact assessment
+
+## In scope
+
+- Path traversal or arbitrary file read/write via a crafted `manifest.json`
+  (e.g. `../` in file paths)
+- Schema or hash-validation bypass that allows a tampered bundle to pass
+  `validate.py`
+- Signer policy bypass that allows an unauthorized identity to have its
+  submission accepted
+- Malicious bundle content that causes the index builder or static site to
+  execute or inject code
+- Credential or token leakage through CI logs or generated site artifacts
+
+## Out of scope
+
+- Vulnerabilities in Sigstore, Rekor, or `cosign` themselves (report upstream)
+- GitHub Actions runner or Pages infrastructure issues (report to GitHub)
+- Fabricated benchmark results that pass all cryptographic checks — this is an
+  anti-tamper system, not a remote execution verifier; see `GOVERNANCE.md` for
+  the dispute/revocation process
+- Denial of service via an oversized bundle (resource-sizing, not a
+  vulnerability)

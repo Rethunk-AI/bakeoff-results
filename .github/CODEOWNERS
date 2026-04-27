@@ -1,0 +1,19 @@
+# Default owner for everything in this repo.
+# GitHub uses the LAST matching pattern, so order from general to specific.
+
+*                           @AlbinoGeek
+
+# Doc tiers and governance — changes here affect every future contributor.
+/README.md                  @AlbinoGeek
+/HUMANS.md                  @AlbinoGeek
+/AGENTS.md                  @AlbinoGeek
+/CLAUDE.md                  @AlbinoGeek
+/GOVERNANCE.md              @AlbinoGeek
+
+# Signer policy — changes here affect the trust model.
+/signers.yaml               @AlbinoGeek
+/signers.example.yaml       @AlbinoGeek
+
+# CI + repo hygiene
+/.github/                   @AlbinoGeek
+/pyproject.toml             @AlbinoGeek
