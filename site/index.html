@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rethunk Bakeoff Results</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }
+    input { margin: 1rem 0; max-width: 32rem; padding: 0.5rem; width: 100%; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f6f8fa; }
+  </style>
+</head>
+<body>
+  <h1>Rethunk Bakeoff Results</h1>
+  <p>Generated at 2026-04-27T01:48:06+00:00. This static index is backed by validated
+  result bundles and is private until publication is approved.</p>
+  <label for="filter">Filter results</label>
+  <input id="filter" type="search" placeholder="Filter by run, signer, model, judge mode, or config hash">
+  <table>
+    <thead>
+      <tr>
+        <th>Run ID</th>
+        <th>Timestamp</th>
+        <th>Signer</th>
+        <th>Models</th>
+        <th>Judge Mode</th>
+        <th>Config Hash</th>
+      </tr>
+    </thead>
+    <tbody id="results">
+<tr><td colspan="6">No submissions have been published yet.</td></tr>
+    </tbody>
+  </table>
+  <script>
+    const filter = document.getElementById("filter");
+    const rows = Array.from(document.querySelectorAll("#results tr"));
+    filter.addEventListener("input", () => {
+      const query = filter.value.toLowerCase();
+      for (const row of rows) {
+        row.hidden = !row.textContent.toLowerCase().includes(query);
+      }
+    });
+  </script>
+</body>
+</html>

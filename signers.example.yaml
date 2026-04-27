@@ -1,0 +1,21 @@
+# Placeholder signer allowlist for bakeoff result bundles.
+#
+# Copy to signers.yaml only when a real policy is approved. The validator does
+# not parse this file yet; it documents the intended policy shape for the CI
+# Sigstore verification step.
+
+schema_version: bakeoff-results-signers/v1
+trusted_repositories:
+  - repository: Rethunk-AI/bakeoff
+    issuer: https://token.actions.githubusercontent.com
+    subjects:
+      - repo:Rethunk-AI/bakeoff:ref:refs/heads/main
+    workflows:
+      - .github/workflows/package-results.yml
+trusted_identities:
+  - identity: github-actions[bot]
+    issuer: https://token.actions.githubusercontent.com
+notes:
+  - Replace placeholder subjects and workflows before public release.
+  - Require Sigstore/Rekor verification for submitted bundles.
+  - Require GitHub artifact attestations for generated site artifacts.

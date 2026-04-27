@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Future artifact attestation jobs will need id-token: write and
+      # attestations: write once publication settings are approved.
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python
+        run: python -m compileall src tests
+
+      - name: Run tests
+        run: PYTHONPATH=src python -m unittest discover -s tests
+
+      - name: Validate submissions
+        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
+
+      - name: Build static index
+        run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
+
+      # Future GitHub Pages deployment can publish ./site after repository
+      # settings, environment protection, and approval policy are finalized.
