@@ -11,14 +11,31 @@ that content here.
 - **File layout, schema versions, CI jobs:** [`AGENTS.md`](AGENTS.md)
 - **Result states, signer policy, moderation:** [`GOVERNANCE.md`](GOVERNANCE.md)
 
+## Development setup
+
+No install required. The validator and index builder use stdlib only and run
+via `PYTHONPATH`:
+
+```sh
+git clone https://github.com/Rethunk-AI/bakeoff-results
+cd bakeoff-results
+# No pip install needed for development — all commands use PYTHONPATH=src
+```
+
+Alternatively, install in editable mode for the packaged entry-points:
+
+```sh
+pip install -e .
+bakeoff-results-validate --help
+bakeoff-results-build-index --help
+```
+
 ## Before opening a PR
 
 ```sh
 python -m compileall src tests
 PYTHONPATH=src python -m unittest discover -s tests
 ```
-
-No additional dev dependencies — the validator and index builder use stdlib only.
 
 ## Commits and PRs
 
