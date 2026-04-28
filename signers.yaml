@@ -1,3 +1,13 @@
+# TRUST NOTE: This file is unsigned plain YAML. Verify integrity via signed git
+# commits. Any change to this file should be introduced in a GPG-signed or
+# SSH-signed commit by a quorum of existing signers. Unsigned modifications to
+# this file represent a trust-bootstrap compromise and must be reverted
+# immediately.
+#
+# Verify the last commit modifying this file:
+#   git log --format=fuller --all -- signers.yaml | grep -A 2 "^Commit:"
+# Look for "gpgsig" or "ssh" prefix on the Commit line.
+#
 schema_version: bakeoff-results-signers/v1
 trusted_repositories:
   - repository: Rethunk-AI/bakeoff

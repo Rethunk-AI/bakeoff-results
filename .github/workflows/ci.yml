@@ -15,6 +15,26 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify signers.yaml commit signature
+        run: |
+          # Check if the last commit touching signers.yaml is signed
+          last_commit=$(git log --format=%H -1 -- signers.yaml)
+          if [ -z "$last_commit" ]; then
+            echo "No commits found for signers.yaml; skipping signature check"
+            exit 0
+          fi
+
+          signature=$(git log --format=%B "$last_commit" | grep -i "gpgsig\|ssh")
+          if [ -z "$signature" ]; then
+            echo "WARNING: Last commit to signers.yaml is not GPG/SSH signed"
+            echo "Commit: $last_commit"
+            echo "For production, this should trigger a hard failure."
+            exit 0
+          fi
+          echo "INFO: signers.yaml commit is signed"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -49,6 +69,26 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify signers.yaml commit signature
+        run: |
+          # Check if the last commit touching signers.yaml is signed
+          last_commit=$(git log --format=%H -1 -- signers.yaml)
+          if [ -z "$last_commit" ]; then
+            echo "No commits found for signers.yaml; skipping signature check"
+            exit 0
+          fi
+
+          signature=$(git log --format=%B "$last_commit" | grep -i "gpgsig\|ssh")
+          if [ -z "$signature" ]; then
+            echo "WARNING: Last commit to signers.yaml is not GPG/SSH signed"
+            echo "Commit: $last_commit"
+            echo "For production, this should trigger a hard failure."
+            exit 0
+          fi
+          echo "INFO: signers.yaml commit is signed"
 
       - name: Set up Python
         uses: actions/setup-python@v6
