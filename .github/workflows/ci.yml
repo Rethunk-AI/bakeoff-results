@@ -6,6 +6,13 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -107,17 +114,6 @@ jobs:
           subject-path: |
             site/index.json
             site/index.html
-
-      - name: Enable Pages (public)
-        run: |
-          gh api --method POST "repos/$GITHUB_REPOSITORY/pages" \
-            -f source[branch]=main \
-            -f source[path]=/site \
-            -f public=true \
-            || gh api --method PUT "repos/$GITHUB_REPOSITORY/pages" \
-            -f public=true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
