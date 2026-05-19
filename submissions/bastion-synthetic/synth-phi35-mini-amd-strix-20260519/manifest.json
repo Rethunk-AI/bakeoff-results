@@ -1,0 +1,11 @@
+{
+  "schema_version": "bakeoff-results/v1",
+  "bundle": {
+    "run_id": "synth-phi35-mini-amd-strix-20260519",
+    "timestamp": "2026-05-19T10:00:00Z"
+  },
+  "files": {
+    "result.json": "40fc0963ba81c9eb332c1f7c359ea286adf7c988158aa26a859e85bfd984cc9a",
+    "summary.md": "59f071fc4f4cba105beaf183c5d35ed829e5f3fb8b9b0ad065eceaebf0e9ae21"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": "bakeoff-results/v1",
+  "bundle": {
+    "run_id": "synth-llama31-8b-rtx4090-20260519",
+    "timestamp": "2026-05-19T10:05:00Z"
+  },
+  "files": {
+    "result.json": "5bdd5492e0107e880ad71b8ad87e66c03b0af2ce78b921fc42d92dd99008af35",
+    "summary.md": "8e7ba817dff384cdb19efb952ee75dcb6fe819f46b3f510069148cc66a453a05"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "run_id": "synth-mixtral-8x7b-amd-strix-20260519",
+  "timestamp": "2026-05-19T10:10:00Z",
+  "provenance": {
+    "git": {
+      "sha": "6495839a6cdb52e38c53f59f4a9d23c9dfb400ac"
+    }
+  },
+  "models": [
+    {
+      "id": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+      "model_family": "Mixtral",
+      "parameters": "46.7B",
+      "active_parameters": "12.9B",
+      "quantization": "Q4_K_M",
+      "context_length": "32K",
+      "architecture": "MoE"
+    }
+  ],
+  "hardware": {
+    "device_name": "AMD Radeon 890M (Strix Halo iGPU)",
+    "vram_gb": 90,
+    "device_pci": "1002:15bf"
+  },
+  "judge_mode": "synthetic"
+}

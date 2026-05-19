@@ -1,0 +1,11 @@
+{
+  "schema_version": "bakeoff-results/v1",
+  "bundle": {
+    "run_id": "synth-mixtral-8x7b-amd-strix-20260519",
+    "timestamp": "2026-05-19T10:10:00Z"
+  },
+  "files": {
+    "result.json": "097d8e1aff8a99848da02ec76f9faa1e51bfe88d7cc43b66af7967f9d8f9e3ff",
+    "summary.md": "57a63e0ff4a270d8b0eecdb4c6330d458a9f522c81d80ea2a645726e203a09ae"
+  }
+}
