@@ -151,8 +151,6 @@
         const query = fText.value.toLowerCase();
         const matchText = !query || text.includes(query);
 
-        const sel = document.getElementById("f-" + "{'family','arch','quant','ctx','params','gpu','vram'}".split(",").join(", 'f-") + "'";
-
         let match = true;
         const family = document.getElementById("f-family").value;
         if (family && (row.dataset.model_family || "").toLowerCase() !== family.toLowerCase()) match = false;
