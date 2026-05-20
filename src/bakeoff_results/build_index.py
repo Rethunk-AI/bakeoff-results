@@ -254,28 +254,53 @@ def _gpu_arch_family(hw: str | dict) -> str:
     pci = hw.get("device_pci", "")
     # PCI ID mapping for known families
     pci_map = {
+        # NVIDIA
         "10de:2204": "Ada Lovelace",   # RTX 4090
         "10de:a000": "Ampere",          # A100
         "10de:2334": "Hopper",          # H100
         "10de:20b2": "Ampere",          # V100
         "10de:2350": "Hopper",          # H200
+        # AMD
+        "1002:15bf": "AMD RDNA3/Strix Halo",
     }
     if pci in pci_map:
         return pci_map[pci]
+    # AMD prefix fallback (vendor 1002)
+    if pci.startswith("1002:"):
+        return "AMD"
     if any(k in name.upper() for k in ("4090", "4080", "4070", "RTX 5")):
         return "Ada Lovelace"
     if any(k in name.upper() for k in ("A100", "A40")):
         return "Ampere"
     if any(k in name.upper() for k in ("H100", "H200", "H800")):
         return "Hopper"
+    if "RDNA" in name.upper() or "RADEON" in name.upper():
+        return "AMD"
     return "unknown"
+
+
+def _hw_cell_html(hw: Any) -> str:
+    """Render hardware data as structured HTML for display in the table cell."""
+    if not isinstance(hw, dict):
+        return html.escape(str(hw))
+    parts = []
+    name = hw.get("device_name")
+    if name:
+        parts.append(html.escape(str(name)))
+    vram = hw.get("vram_gb")
+    if vram is not None:
+        parts.append(f"{html.escape(str(vram))} GB")
+    pci = hw.get("device_pci")
+    if pci:
+        parts.append(f"PCI {html.escape(str(pci))}")
+    return " · ".join(parts) if parts else html.escape(str(hw))
 
 
 def render_html(payload: dict[str, Any]) -> str:
     rows = []
     for entry in payload["entries"]:
         model_ids = ", ".join(entry.get("model_ids") or [])
-        cells = [
+        plain_cells = [
             entry.get("run_id"),
             entry.get("timestamp"),
             entry.get("signer") or "",
@@ -288,24 +313,22 @@ def render_html(payload: dict[str, Any]) -> str:
             (entry.get("params_active") or "—"),
             entry.get("context_length") or "unknown",
             entry.get("quantization") or "unknown",
-            entry.get("hardware") or "unknown",
         ]
-        cells_html = "".join(f"<td>{html.escape(str(cell))}</td>" for cell in cells)
+        hw = entry.get("hardware") or "unknown"
+        cells_html = "".join(f"<td>{html.escape(str(cell))}</td>" for cell in plain_cells)
+        cells_html += f"<td>{_hw_cell_html(hw)}</td>"
         # Build data attributes for filtering
-        hw = entry.get("hardware")
-        hw_str = "unknown" if hw is None else (str(hw) if not isinstance(hw, dict) else "")
         data = {
             "model_family": entry.get("model_family") or "unknown",
             "architecture": entry.get("architecture") or "unknown",
             "quantization": entry.get("quantization") or "unknown",
             "context_length": entry.get("context_length") or "unknown",
             "params_total": entry.get("params_total") or "unknown",
-            "hardware": hw_str,
             "hw_tier": _hw_tier(hw)[0],
             "hw_bucket": _hw_tier(hw)[1],
             "hw_arch": _gpu_arch_family(hw),
         }
-        attrs = " ".join(f"data-{k}={html.escape(v)}" for k, v in data.items())
+        attrs = " ".join(f'data-{k}="{html.escape(v, quote=True)}"' for k, v in data.items())
         rows.append(f"<tr {attrs}>{cells_html}</tr>")
 
     generated_at = html.escape(str(payload["generated_at"]))
@@ -352,7 +375,7 @@ def render_html(payload: dict[str, Any]) -> str:
       <label><strong>Filter results</strong></label>
       <button class="filter-chevron" id="filter-toggle" aria-label="Toggle filter bar" title="Toggle filters">▼</button>
     </div>
-    <motion.div id="filter-chip-strip" class="filter-chip-strip"></div>
+    <div id="filter-chip-strip" class="filter-chip-strip"></div>
     <div id="filter-rows-wrap" class="filter-rows-wrap">
       <div class="filter-row">
         <div class="filter-group">
@@ -469,6 +492,30 @@ def render_html(payload: dict[str, Any]) -> str:
       return "unknown";
     }}
 
+    // Populate computed-value dropdowns
+    function populateComputed(id, computeFn) {{
+      const sel = document.getElementById(id);
+      const vals = new Set();
+      rows.forEach(r => {{
+        const v = computeFn(r);
+        if (v && v !== "unknown") vals.add(v);
+      }});
+      [...vals].sort().forEach(v => {{
+        const opt = document.createElement("option");
+        opt.value = v; opt.textContent = v;
+        sel.appendChild(opt);
+      }});
+    }}
+
+    // Populate all filter dropdowns
+    populateSelect("f-family", "model_family");
+    populateSelect("f-arch", "architecture");
+    populateSelect("f-quant", "quantization");
+    populateComputed("f-ctx",    r => ctxRange(r.dataset.context_length || ""));
+    populateComputed("f-params", r => paramsRange(parseParams(r.dataset.params_total || "")));
+    populateComputed("f-gpu",    r => r.dataset.hw_arch || "");
+    populateComputed("f-vram",   r => r.dataset.hw_bucket || "");
+
     // Multi-dimensional filter
     function applyFilters() {{
       let visible = 0;
@@ -540,7 +587,7 @@ def render_html(payload: dict[str, Any]) -> str:
           const span = document.createElement("span");
           span.className = "hw-badge";
           span.textContent = (groups[key].length - 1) + " other result(s) on similar hardware";
-          row.querySelector("td:last-child").appendChild(span);
+          row.cells[0].appendChild(span);
         }}
       }});
     }}
