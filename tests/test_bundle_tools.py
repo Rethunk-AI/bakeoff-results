@@ -184,10 +184,10 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertEqual(entry["judge_mode"], "static-fixture")
             self.assertEqual(entry["config_hash"], "config-sha256")
             self.assertTrue((root / "site" / "index.json").is_file())
-            self.assertIn(
-                "Rethunk Bakeoff Results",
-                (root / "site" / "index.html").read_text(encoding="utf-8"),
-            )
+            html = (root / "site" / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Rethunk Bakeoff Results", html)
+            self.assertIn('id="filter-toggle"', html)
+            self.assertNotIn("<tr><tr>", html)
 
     def test_index_accepts_current_bakeoff_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

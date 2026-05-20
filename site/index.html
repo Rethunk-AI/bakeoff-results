@@ -31,47 +31,47 @@
 </head>
 <body>
   <h1>Rethunk Bakeoff Results</h1>
-  <p>Generated at 2026-05-19T10:48:54+00:00. This static index is backed by validated
+  <p>Generated at 2026-05-20T05:32:39+00:00. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar">
     <div class="filter-bar-header">
       <label><strong>Filter results</strong></label>
       <button class="filter-chevron" id="filter-toggle" aria-label="Toggle filter bar" title="Toggle filters">▼</button>
     </div>
-    <div id="filter-chip-strip" class="filter-chip-strip"></div>
+    <motion.div id="filter-chip-strip" class="filter-chip-strip"></div>
     <div id="filter-rows-wrap" class="filter-rows-wrap">
       <div class="filter-row">
         <div class="filter-group">
           <label for="f-family">Model Family</label>
           <select id="f-family"><option value="">All</option></select>
         </div>
-        <div class="filter-group">
-          <label for="f-arch">Architecture</label>
-          <select id="f-arch"><option value="">All</option></select>
-        </div>
-        <div class="filter-group">
-          <label for="f-quant">Quantization</label>
-          <select id="f-quant"><option value="">All</option></select>
-        </div>
-        <div class="filter-group">
-          <label for="f-ctx">Context Length</label>
-          <select id="f-ctx"><option value="">All</option></select>
-        </div>
+      <div class="filter-group">
+        <label for="f-arch">Architecture</label>
+        <select id="f-arch"><option value="">All</option></select>
       </div>
-      <div class="filter-row">
-        <div class="filter-group">
-          <label for="f-params">Parameter Range</label>
-          <select id="f-params"><option value="">Any</option></select>
-        </div>
-        <div class="filter-group">
-          <label for="f-gpu">GPU Architecture</label>
-          <select id="f-gpu"><option value="">All</option></select>
-        </div>
-        <div class="filter-group">
-          <label for="f-vram">VRAM Tier</label>
-          <select id="f-vram"><option value="">All</option></select>
-        </div>
+      <div class="filter-group">
+        <label for="f-quant">Quantization</label>
+        <select id="f-quant"><option value="">All</option></select>
       </div>
+      <div class="filter-group">
+        <label for="f-ctx">Context Length</label>
+        <select id="f-ctx"><option value="">All</option></select>
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label for="f-params">Parameter Range</label>
+        <select id="f-params"><option value="">Any</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="f-gpu">GPU Architecture</label>
+        <select id="f-gpu"><option value="">All</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="f-vram">VRAM Tier</label>
+        <select id="f-vram"><option value="">All</option></select>
+      </div>
+    </div>
     </div>
   </div>
   <button class="toggle-btn" id="toggle-hw">Show Hardware</button>
@@ -96,9 +96,9 @@
       </tr>
     </thead>
     <tbody id="results">
-<tr data-model_family=Mixtral data-architecture=unknown data-quantization=Q4_K_M data-context_length=32K data-hardware= data-hw_tier=GPU data-hw_bucket=medium data-hw_arch=unknown><tr><td>synth-mixtral-8x7b-amd-strix-20260519</td><td>2026-05-19T10:10:00Z</td><td></td><td>mistralai/Mixtral-8x7B-Instruct-v0.1</td><td>synthetic</td><td></td><td>Mixtral</td><td>unknown</td><td>46.7B</td><td>12.9B</td><td>32K</td><td>Q4_K_M</td><td>{&#x27;device_name&#x27;: &#x27;AMD Radeon 890M (Strix Halo iGPU)&#x27;, &#x27;vram_gb&#x27;: 90, &#x27;device_pci&#x27;: &#x27;1002:15bf&#x27;}</td></tr></tr>
-<tr data-model_family=LLaMA data-architecture=unknown data-quantization=Q4_K_M data-context_length=128K data-hardware= data-hw_tier=GPU data-hw_bucket=low data-hw_arch=Ada Lovelace><tr><td>synth-llama31-8b-rtx4090-20260519</td><td>2026-05-19T10:05:00Z</td><td></td><td>meta-llama/Meta-Llama-3.1-8B-Instruct</td><td>synthetic</td><td></td><td>LLaMA</td><td>unknown</td><td>8B</td><td>—</td><td>128K</td><td>Q4_K_M</td><td>{&#x27;device_name&#x27;: &#x27;NVIDIA GeForce RTX 4090&#x27;, &#x27;vram_gb&#x27;: 24, &#x27;device_pci&#x27;: &#x27;10de:2204&#x27;}</td></tr></tr>
-<tr data-model_family=Phi data-architecture=unknown data-quantization=Q4_K_M data-context_length=128K data-hardware= data-hw_tier=GPU data-hw_bucket=medium data-hw_arch=unknown><tr><td>synth-phi35-mini-amd-strix-20260519</td><td>2026-05-19T10:00:00Z</td><td></td><td>microsoft/Phi-3.5-mini-instruct</td><td>synthetic</td><td></td><td>Phi</td><td>unknown</td><td>3.8B</td><td>—</td><td>128K</td><td>Q4_K_M</td><td>{&#x27;device_name&#x27;: &#x27;AMD Radeon 890M (Strix Halo iGPU)&#x27;, &#x27;vram_gb&#x27;: 90, &#x27;device_pci&#x27;: &#x27;1002:15bf&#x27;}</td></tr></tr>
+<tr data-model_family=Mixtral data-architecture=unknown data-quantization=Q4_K_M data-context_length=32K data-params_total=46.7B data-hardware= data-hw_tier=GPU data-hw_bucket=medium data-hw_arch=unknown><td>synth-mixtral-8x7b-amd-strix-20260519</td><td>2026-05-19T10:10:00Z</td><td></td><td>mistralai/Mixtral-8x7B-Instruct-v0.1</td><td>synthetic</td><td></td><td>Mixtral</td><td>unknown</td><td>46.7B</td><td>12.9B</td><td>32K</td><td>Q4_K_M</td><td>{&#x27;device_name&#x27;: &#x27;AMD Radeon 890M (Strix Halo iGPU)&#x27;, &#x27;vram_gb&#x27;: 90, &#x27;device_pci&#x27;: &#x27;1002:15bf&#x27;}</td></tr>
+<tr data-model_family=LLaMA data-architecture=unknown data-quantization=Q4_K_M data-context_length=128K data-params_total=8B data-hardware= data-hw_tier=GPU data-hw_bucket=low data-hw_arch=Ada Lovelace><td>synth-llama31-8b-rtx4090-20260519</td><td>2026-05-19T10:05:00Z</td><td></td><td>meta-llama/Meta-Llama-3.1-8B-Instruct</td><td>synthetic</td><td></td><td>LLaMA</td><td>unknown</td><td>8B</td><td>—</td><td>128K</td><td>Q4_K_M</td><td>{&#x27;device_name&#x27;: &#x27;NVIDIA GeForce RTX 4090&#x27;, &#x27;vram_gb&#x27;: 24, &#x27;device_pci&#x27;: &#x27;10de:2204&#x27;}</td></tr>
+<tr data-model_family=Phi data-architecture=unknown data-quantization=Q4_K_M data-context_length=128K data-params_total=3.8B data-hardware= data-hw_tier=GPU data-hw_bucket=medium data-hw_arch=unknown><td>synth-phi35-mini-amd-strix-20260519</td><td>2026-05-19T10:00:00Z</td><td></td><td>microsoft/Phi-3.5-mini-instruct</td><td>synthetic</td><td></td><td>Phi</td><td>unknown</td><td>3.8B</td><td>—</td><td>128K</td><td>Q4_K_M</td><td>{&#x27;device_name&#x27;: &#x27;AMD Radeon 890M (Strix Halo iGPU)&#x27;, &#x27;vram_gb&#x27;: 90, &#x27;device_pci&#x27;: &#x27;1002:15bf&#x27;}</td></tr>
     </tbody>
   </table>
   <p id="no-results" style="display:none">No results match selected filters.</p>
@@ -190,13 +190,13 @@
 
         const gpu = document.getElementById("f-gpu").value;
         if (gpu) {
-          const rowArch = _gpu_arch_family(row.dataset.hardware || "");
-          if ((rowArch || "").toLowerCase() !== gpu.toLowerCase()) match = false;
+          const rowArch = row.dataset.hw_arch || "unknown";
+          if (rowArch !== "unknown" && rowArch.toLowerCase() !== gpu.toLowerCase()) match = false;
         }
 
         const vram = document.getElementById("f-vram").value;
         if (vram) {
-          const rowVram = vramBucket(JSON.parse(row.dataset.hardware || "{}"));
+          const rowVram = row.dataset.hw_bucket || "unknown";
           if (rowVram !== "unknown" && rowVram !== vram) match = false;
         }
 
@@ -319,7 +319,6 @@
       setFilterBarExpanded(!expanded);
     });
 
-    // Init from localStorage — default collapsed
     let initExpanded = false;
     try {
       const stored = localStorage.getItem("filter_bar_expanded");

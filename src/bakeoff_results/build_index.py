@@ -290,7 +290,7 @@ def render_html(payload: dict[str, Any]) -> str:
             entry.get("quantization") or "unknown",
             entry.get("hardware") or "unknown",
         ]
-        row = "<tr>" + "".join(f"<td>{html.escape(str(cell))}</td>" for cell in cells) + "</tr>"
+        cells_html = "".join(f"<td>{html.escape(str(cell))}</td>" for cell in cells)
         # Build data attributes for filtering
         hw = entry.get("hardware")
         hw_str = "unknown" if hw is None else (str(hw) if not isinstance(hw, dict) else "")
@@ -299,14 +299,14 @@ def render_html(payload: dict[str, Any]) -> str:
             "architecture": entry.get("architecture") or "unknown",
             "quantization": entry.get("quantization") or "unknown",
             "context_length": entry.get("context_length") or "unknown",
+            "params_total": entry.get("params_total") or "unknown",
             "hardware": hw_str,
             "hw_tier": _hw_tier(hw)[0],
             "hw_bucket": _hw_tier(hw)[1],
             "hw_arch": _gpu_arch_family(hw),
         }
         attrs = " ".join(f"data-{k}={html.escape(v)}" for k, v in data.items())
-        row = f"<tr {attrs}>{row}</tr>"
-        rows.append(row)
+        rows.append(f"<tr {attrs}>{cells_html}</tr>")
 
     generated_at = html.escape(str(payload["generated_at"]))
     body_rows = "\n".join(rows) if rows else (
@@ -325,6 +325,14 @@ def render_html(payload: dict[str, Any]) -> str:
     th, td {{ border-bottom: 1px solid #ddd; padding: 0.5rem; text-align: left; }}
     th {{ background: #f6f8fa; }}
     .filter-bar {{ margin: 1rem 0; padding: 1rem; background: #f9f9f9; border-radius: 4px; }}
+    .filter-bar-header {{ display: flex; justify-content: space-between; align-items: center; }}
+    .filter-chevron {{ background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.1rem 0.4rem; border-radius: 3px; color: #444; line-height: 1; }}
+    .filter-chevron:hover {{ background: #e8eaed; }}
+    .filter-rows-wrap {{ margin-top: 0.75rem; }}
+    .filter-chip-strip {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }}
+    .filter-chip {{ display: inline-flex; align-items: center; gap: 0.3rem; background: #ddf4ff; color: #0969da; border: 1px solid #b6daff; border-radius: 12px; padding: 2px 10px; font-size: 0.8em; }}
+    .filter-chip-clear {{ background: none; border: none; cursor: pointer; color: #0969da; font-size: 1em; padding: 0; line-height: 1; margin-left: 2px; }}
+    .filter-chip-clear:hover {{ color: #cf222e; }}
     .filter-row {{ display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }}
     .filter-group {{ flex: 1; min-width: 150px; }}
     .filter-group label {{ display: block; font-size: 0.85em; margin-bottom: 0.25rem; }}
@@ -340,12 +348,17 @@ def render_html(payload: dict[str, Any]) -> str:
   <p>Generated at {generated_at}. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar">
-    <label><strong>Filter results</strong></label>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label for="f-family">Model Family</label>
-        <select id="f-family"><option value="">All</option></select>
-      </div>
+    <div class="filter-bar-header">
+      <label><strong>Filter results</strong></label>
+      <button class="filter-chevron" id="filter-toggle" aria-label="Toggle filter bar" title="Toggle filters">▼</button>
+    </div>
+    <motion.div id="filter-chip-strip" class="filter-chip-strip"></div>
+    <div id="filter-rows-wrap" class="filter-rows-wrap">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label for="f-family">Model Family</label>
+          <select id="f-family"><option value="">All</option></select>
+        </div>
       <div class="filter-group">
         <label for="f-arch">Architecture</label>
         <select id="f-arch"><option value="">All</option></select>
@@ -372,6 +385,7 @@ def render_html(payload: dict[str, Any]) -> str:
         <label for="f-vram">VRAM Tier</label>
         <select id="f-vram"><option value="">All</option></select>
       </div>
+    </div>
     </div>
   </div>
   <button class="toggle-btn" id="toggle-hw">Show Hardware</button>
@@ -463,8 +477,6 @@ def render_html(payload: dict[str, Any]) -> str:
         const query = fText.value.toLowerCase();
         const matchText = !query || text.includes(query);
 
-        const sel = document.getElementById("f-" + "{{'family','arch','quant','ctx','params','gpu','vram'}}".split(",").join(", 'f-") + "'";
-
         let match = true;
         const family = document.getElementById("f-family").value;
         if (family && (row.dataset.model_family || "").toLowerCase() !== family.toLowerCase()) match = false;
@@ -490,13 +502,13 @@ def render_html(payload: dict[str, Any]) -> str:
 
         const gpu = document.getElementById("f-gpu").value;
         if (gpu) {{
-          const rowArch = _gpu_arch_family(row.dataset.hardware || "");
-          if ((rowArch || "").toLowerCase() !== gpu.toLowerCase()) match = false;
+          const rowArch = row.dataset.hw_arch || "unknown";
+          if (rowArch !== "unknown" && rowArch.toLowerCase() !== gpu.toLowerCase()) match = false;
         }}
 
         const vram = document.getElementById("f-vram").value;
         if (vram) {{
-          const rowVram = vramBucket(JSON.parse(row.dataset.hardware || "{{}}"));
+          const rowVram = row.dataset.hw_bucket || "unknown";
           if (rowVram !== "unknown" && rowVram !== vram) match = false;
         }}
 
@@ -562,11 +574,75 @@ def render_html(payload: dict[str, Any]) -> str:
       }}
     }} catch(e) {{}}
 
+    // Collapsible filter bar
+    const filterRowsWrap = document.getElementById("filter-rows-wrap");
+    const filterChipStrip = document.getElementById("filter-chip-strip");
+    const filterToggleBtn = document.getElementById("filter-toggle");
+
+    const FILTER_LABELS = {{
+      "f-family": "Model Family",
+      "f-arch": "Architecture",
+      "f-quant": "Quantization",
+      "f-ctx": "Context Length",
+      "f-params": "Parameter Range",
+      "f-gpu": "GPU Architecture",
+      "f-vram": "VRAM Tier"
+    }};
+
+    function renderChips() {{
+      filterChipStrip.innerHTML = "";
+      const expanded = filterRowsWrap.style.display !== "none";
+      if (expanded) return;
+      Object.keys(FILTER_LABELS).forEach(id => {{
+        const sel = document.getElementById(id);
+        if (!sel || !sel.value) return;
+        const chip = document.createElement("span");
+        chip.className = "filter-chip";
+        const label = document.createElement("span");
+        label.textContent = FILTER_LABELS[id] + ": ";
+        const val = document.createElement("strong");
+        val.textContent = sel.options[sel.selectedIndex].text;
+        chip.appendChild(label);
+        chip.appendChild(val);
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "filter-chip-clear";
+        clearBtn.textContent = "×";
+        clearBtn.title = "Clear " + FILTER_LABELS[id];
+        clearBtn.addEventListener("click", () => {{
+          sel.value = "";
+          applyFilters();
+          renderChips();
+        }});
+        chip.appendChild(clearBtn);
+        filterChipStrip.appendChild(chip);
+      }});
+    }}
+
+    function setFilterBarExpanded(expanded) {{
+      filterRowsWrap.style.display = expanded ? "" : "none";
+      filterToggleBtn.textContent = expanded ? "▲" : "▼";
+      filterToggleBtn.title = expanded ? "Collapse filters" : "Expand filters";
+      try {{ localStorage.setItem("filter_bar_expanded", expanded ? "true" : "false"); }} catch(e) {{}}
+      renderChips();
+    }}
+
+    filterToggleBtn.addEventListener("click", () => {{
+      const expanded = filterRowsWrap.style.display !== "none";
+      setFilterBarExpanded(!expanded);
+    }});
+
+    let initExpanded = false;
+    try {{
+      const stored = localStorage.getItem("filter_bar_expanded");
+      if (stored === "true") initExpanded = true;
+    }} catch(e) {{}}
+    setFilterBarExpanded(initExpanded);
+
     // Bind all filter inputs
     ["f-family", "f-arch", "f-quant", "f-ctx", "f-params", "f-gpu", "f-vram", "f-text"].forEach(id => {{
       const el = document.getElementById(id);
-      el.addEventListener("input", applyFilters);
-      el.addEventListener("change", applyFilters);
+      el.addEventListener("input", () => {{ applyFilters(); renderChips(); }});
+      el.addEventListener("change", () => {{ applyFilters(); renderChips(); }});
     }});
 
     applyFilters();
