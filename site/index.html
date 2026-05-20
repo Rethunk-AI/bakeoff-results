@@ -11,6 +11,14 @@
     th, td { border-bottom: 1px solid #ddd; padding: 0.5rem; text-align: left; }
     th { background: #f6f8fa; }
     .filter-bar { margin: 1rem 0; padding: 1rem; background: #f9f9f9; border-radius: 4px; }
+    .filter-bar-header { display: flex; justify-content: space-between; align-items: center; }
+    .filter-chevron { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.1rem 0.4rem; border-radius: 3px; color: #444; line-height: 1; }
+    .filter-chevron:hover { background: #e8eaed; }
+    .filter-rows-wrap { margin-top: 0.75rem; }
+    .filter-chip-strip { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+    .filter-chip { display: inline-flex; align-items: center; gap: 0.3rem; background: #ddf4ff; color: #0969da; border: 1px solid #b6daff; border-radius: 12px; padding: 2px 10px; font-size: 0.8em; }
+    .filter-chip-clear { background: none; border: none; cursor: pointer; color: #0969da; font-size: 1em; padding: 0; line-height: 1; margin-left: 2px; }
+    .filter-chip-clear:hover { color: #cf222e; }
     .filter-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
     .filter-group { flex: 1; min-width: 150px; }
     .filter-group label { display: block; font-size: 0.85em; margin-bottom: 0.25rem; }
@@ -26,37 +34,43 @@
   <p>Generated at 2026-05-19T10:48:54+00:00. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar">
-    <label><strong>Filter results</strong></label>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label for="f-family">Model Family</label>
-        <select id="f-family"><option value="">All</option></select>
-      </div>
-      <div class="filter-group">
-        <label for="f-arch">Architecture</label>
-        <select id="f-arch"><option value="">All</option></select>
-      </div>
-      <div class="filter-group">
-        <label for="f-quant">Quantization</label>
-        <select id="f-quant"><option value="">All</option></select>
-      </div>
-      <div class="filter-group">
-        <label for="f-ctx">Context Length</label>
-        <select id="f-ctx"><option value="">All</option></select>
-      </div>
+    <div class="filter-bar-header">
+      <label><strong>Filter results</strong></label>
+      <button class="filter-chevron" id="filter-toggle" aria-label="Toggle filter bar" title="Toggle filters">▼</button>
     </div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label for="f-params">Parameter Range</label>
-        <select id="f-params"><option value="">Any</option></select>
+    <div id="filter-chip-strip" class="filter-chip-strip"></div>
+    <div id="filter-rows-wrap" class="filter-rows-wrap">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label for="f-family">Model Family</label>
+          <select id="f-family"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="f-arch">Architecture</label>
+          <select id="f-arch"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="f-quant">Quantization</label>
+          <select id="f-quant"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="f-ctx">Context Length</label>
+          <select id="f-ctx"><option value="">All</option></select>
+        </div>
       </div>
-      <div class="filter-group">
-        <label for="f-gpu">GPU Architecture</label>
-        <select id="f-gpu"><option value="">All</option></select>
-      </div>
-      <div class="filter-group">
-        <label for="f-vram">VRAM Tier</label>
-        <select id="f-vram"><option value="">All</option></select>
+      <div class="filter-row">
+        <div class="filter-group">
+          <label for="f-params">Parameter Range</label>
+          <select id="f-params"><option value="">Any</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="f-gpu">GPU Architecture</label>
+          <select id="f-gpu"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label for="f-vram">VRAM Tier</label>
+          <select id="f-vram"><option value="">All</option></select>
+        </div>
       </div>
     </div>
   </div>
@@ -248,11 +262,76 @@
       }
     } catch(e) {}
 
+    // Collapsible filter bar
+    const filterRowsWrap = document.getElementById("filter-rows-wrap");
+    const filterChipStrip = document.getElementById("filter-chip-strip");
+    const filterToggleBtn = document.getElementById("filter-toggle");
+
+    const FILTER_LABELS = {
+      "f-family": "Model Family",
+      "f-arch": "Architecture",
+      "f-quant": "Quantization",
+      "f-ctx": "Context Length",
+      "f-params": "Parameter Range",
+      "f-gpu": "GPU Architecture",
+      "f-vram": "VRAM Tier"
+    };
+
+    function renderChips() {
+      filterChipStrip.innerHTML = "";
+      const expanded = filterRowsWrap.style.display !== "none";
+      if (expanded) return;
+      Object.keys(FILTER_LABELS).forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel || !sel.value) return;
+        const chip = document.createElement("span");
+        chip.className = "filter-chip";
+        const label = document.createElement("span");
+        label.textContent = FILTER_LABELS[id] + ": ";
+        const val = document.createElement("strong");
+        val.textContent = sel.options[sel.selectedIndex].text;
+        chip.appendChild(label);
+        chip.appendChild(val);
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "filter-chip-clear";
+        clearBtn.textContent = "×";
+        clearBtn.title = "Clear " + FILTER_LABELS[id];
+        clearBtn.addEventListener("click", () => {
+          sel.value = "";
+          applyFilters();
+          renderChips();
+        });
+        chip.appendChild(clearBtn);
+        filterChipStrip.appendChild(chip);
+      });
+    }
+
+    function setFilterBarExpanded(expanded) {
+      filterRowsWrap.style.display = expanded ? "" : "none";
+      filterToggleBtn.textContent = expanded ? "▲" : "▼";
+      filterToggleBtn.title = expanded ? "Collapse filters" : "Expand filters";
+      try { localStorage.setItem("filter_bar_expanded", expanded ? "true" : "false"); } catch(e) {}
+      renderChips();
+    }
+
+    filterToggleBtn.addEventListener("click", () => {
+      const expanded = filterRowsWrap.style.display !== "none";
+      setFilterBarExpanded(!expanded);
+    });
+
+    // Init from localStorage — default collapsed
+    let initExpanded = false;
+    try {
+      const stored = localStorage.getItem("filter_bar_expanded");
+      if (stored === "true") initExpanded = true;
+    } catch(e) {}
+    setFilterBarExpanded(initExpanded);
+
     // Bind all filter inputs
     ["f-family", "f-arch", "f-quant", "f-ctx", "f-params", "f-gpu", "f-vram", "f-text"].forEach(id => {
       const el = document.getElementById(id);
-      el.addEventListener("input", applyFilters);
-      el.addEventListener("change", applyFilters);
+      el.addEventListener("input", () => { applyFilters(); renderChips(); });
+      el.addEventListener("change", () => { applyFilters(); renderChips(); });
     });
 
     applyFilters();
