@@ -4,6 +4,14 @@ Private staging repository for publishing approved bakeoff result bundles from
 `Rethunk-AI/bakeoff`. Bundles are validated, indexed, and published to GitHub
 Pages after signer policy and release approval checks pass.
 
+## Product preview
+
+![Bakeoff results explorer with filters](docs/readme/screenshot-home.png)
+
+*Bakeoff results explorer with filters.*
+
+See [HUMANS.md](HUMANS.md) for setup and run instructions.
+
 ## Documentation
 
 - [HUMANS.md](HUMANS.md) — validate, build, test, verify attestations, bundle schema
