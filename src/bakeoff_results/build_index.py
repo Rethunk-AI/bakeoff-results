@@ -347,6 +347,10 @@ def render_html(payload: dict[str, Any]) -> str:
     table {{ border-collapse: collapse; width: 100%; }}
     th, td {{ border-bottom: 1px solid #ddd; padding: 0.5rem; text-align: left; }}
     th {{ background: #f6f8fa; }}
+    th.sortable {{ cursor: pointer; user-select: none; white-space: nowrap; }}
+    th.sortable:hover {{ background: #e8eaed; }}
+    th.sort-asc::after {{ content: " ▲"; font-size: 0.8em; color: #0969da; }}
+    th.sort-desc::after {{ content: " ▼"; font-size: 0.8em; color: #0969da; }}
     .filter-bar {{ margin: 1rem 0; padding: 1rem; background: #f9f9f9; border-radius: 4px; }}
     .filter-bar-header {{ display: flex; justify-content: space-between; align-items: center; }}
     .filter-chevron {{ background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.1rem 0.4rem; border-radius: 3px; color: #444; line-height: 1; }}
@@ -359,10 +363,26 @@ def render_html(payload: dict[str, Any]) -> str:
     .filter-row {{ display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }}
     .filter-group {{ flex: 1; min-width: 150px; }}
     .filter-group label {{ display: block; font-size: 0.85em; margin-bottom: 0.25rem; }}
+    .filter-group-controls {{ display: flex; align-items: center; gap: 0.25rem; }}
+    .filter-group-controls select {{ flex: 1; margin: 0; }}
+    .filter-add-btn {{ flex-shrink: 0; padding: 0.3rem 0.5rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; line-height: 1; }}
+    .filter-add-btn:hover {{ background: #e8eaed; }}
+    .multi-panel {{ margin-top: 0.3rem; padding: 0.4rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; max-height: 180px; overflow-y: auto; display: none; }}
+    .multi-panel.active {{ display: block; }}
+    .multi-panel label {{ display: flex; align-items: center; gap: 0.4rem; font-size: 0.85em; margin-bottom: 0.2rem; cursor: pointer; font-weight: normal; }}
+    .multi-panel input[type=checkbox] {{ width: auto; margin: 0; padding: 0; }}
     .hw-badge {{ display: inline-block; margin-left: 0.5rem; font-size: 0.8em; color: #58a6ff; background: #ddf4ff; padding: 1px 6px; border-radius: 3px; }}
     .hw-col {{ display: table-cell; }}
     .toggle-btn {{ padding: 0.4rem 0.8rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; }}
     .toggle-btn:hover {{ background: #e8eaed; }}
+    .table-toolbar {{ display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; flex-wrap: wrap; }}
+    .gear-btn {{ padding: 0.4rem 0.6rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 1rem; line-height: 1; }}
+    .gear-btn:hover {{ background: #e8eaed; }}
+    .col-vis-panel {{ position: absolute; z-index: 100; background: #fff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 0.75rem 1rem; min-width: 200px; display: none; }}
+    .col-vis-panel.active {{ display: block; }}
+    .col-vis-panel h4 {{ margin: 0 0 0.5rem 0; font-size: 0.9em; color: #555; }}
+    .col-vis-panel label {{ display: flex; align-items: center; gap: 0.4rem; font-size: 0.85em; margin-bottom: 0.25rem; cursor: pointer; font-weight: normal; }}
+    .col-vis-panel input[type=checkbox] {{ width: auto; margin: 0; padding: 0; }}
     @media (max-width: 768px) {{ .filter-row {{ flex-direction: column; }} }}
   </style>
 </head>
@@ -378,58 +398,96 @@ def render_html(payload: dict[str, Any]) -> str:
     <div id="filter-chip-strip" class="filter-chip-strip"></div>
     <div id="filter-rows-wrap" class="filter-rows-wrap">
       <div class="filter-row">
-        <div class="filter-group">
+        <div class="filter-group" data-filter-id="f-family">
           <label for="f-family">Model Family</label>
-          <select id="f-family"><option value="">All</option></select>
+          <div class="filter-group-controls">
+            <select id="f-family"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-family" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-family"></div>
         </div>
-      <div class="filter-group">
-        <label for="f-arch">Architecture</label>
-        <select id="f-arch"><option value="">All</option></select>
+        <div class="filter-group" data-filter-id="f-arch">
+          <label for="f-arch">Architecture</label>
+          <div class="filter-group-controls">
+            <select id="f-arch"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-arch" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-arch"></div>
+        </div>
+        <div class="filter-group" data-filter-id="f-quant">
+          <label for="f-quant">Quantization</label>
+          <div class="filter-group-controls">
+            <select id="f-quant"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-quant" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-quant"></div>
+        </div>
+        <div class="filter-group" data-filter-id="f-ctx">
+          <label for="f-ctx">Context Length</label>
+          <div class="filter-group-controls">
+            <select id="f-ctx"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-ctx" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-ctx"></div>
+        </div>
       </div>
-      <div class="filter-group">
-        <label for="f-quant">Quantization</label>
-        <select id="f-quant"><option value="">All</option></select>
+      <div class="filter-row">
+        <div class="filter-group" data-filter-id="f-params">
+          <label for="f-params">Parameter Range</label>
+          <div class="filter-group-controls">
+            <select id="f-params"><option value="">Any</option></select>
+            <button class="filter-add-btn" data-target="f-params" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-params"></div>
+        </div>
+        <div class="filter-group" data-filter-id="f-gpu">
+          <label for="f-gpu">GPU Architecture</label>
+          <div class="filter-group-controls">
+            <select id="f-gpu"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-gpu" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-gpu"></div>
+        </div>
+        <div class="filter-group" data-filter-id="f-vram">
+          <label for="f-vram">VRAM Tier</label>
+          <div class="filter-group-controls">
+            <select id="f-vram"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-vram" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-vram"></div>
+        </div>
       </div>
-      <div class="filter-group">
-        <label for="f-ctx">Context Length</label>
-        <select id="f-ctx"><option value="">All</option></select>
-      </div>
-    </div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label for="f-params">Parameter Range</label>
-        <select id="f-params"><option value="">Any</option></select>
-      </div>
-      <div class="filter-group">
-        <label for="f-gpu">GPU Architecture</label>
-        <select id="f-gpu"><option value="">All</option></select>
-      </div>
-      <div class="filter-group">
-        <label for="f-vram">VRAM Tier</label>
-        <select id="f-vram"><option value="">All</option></select>
-      </div>
-    </div>
     </div>
   </div>
-  <button class="toggle-btn" id="toggle-hw">Show Hardware</button>
+  <div class="table-toolbar">
+    <button class="toggle-btn" id="toggle-hw">Show Hardware</button>
+    <div style="position:relative">
+      <button class="gear-btn" id="col-vis-btn" title="Column visibility">&#9881;</button>
+      <div class="col-vis-panel" id="col-vis-panel">
+        <h4>Column visibility</h4>
+        <div id="col-vis-list"></div>
+      </div>
+    </div>
+    <button class="toggle-btn" id="clear-all-filters" style="margin-left:auto">Clear all filters</button>
+  </div>
   <label for="f-text">Quick search</label>
   <input id="f-text" type="search" placeholder="Filter by run, signer, model, judge mode, config hash, or hardware">
   <table>
     <thead>
       <tr>
-        <th>Run ID</th>
-        <th>Timestamp</th>
-        <th>Signer</th>
-        <th>Models</th>
-        <th>Judge Mode</th>
-        <th>Config Hash</th>
-        <th>Model Family</th>
-        <th>Architecture</th>
-        <th>Params (total)</th>
-        <th>Params (active)</th>
-        <th>Context Len</th>
-        <th>Quantization</th>
-        <th class="hw-col" id="hw-col-header" style="display:none">Hardware</th>
+        <th class="sortable" data-col-index="0">Run ID</th>
+        <th class="sortable" data-col-index="1">Timestamp</th>
+        <th class="sortable" data-col-index="2">Signer</th>
+        <th class="sortable" data-col-index="3">Models</th>
+        <th class="sortable" data-col-index="4">Judge Mode</th>
+        <th class="sortable" data-col-index="5">Config Hash</th>
+        <th class="sortable" data-col-index="6">Model Family</th>
+        <th class="sortable" data-col-index="7">Architecture</th>
+        <th class="sortable" data-col-index="8">Params (total)</th>
+        <th class="sortable" data-col-index="9">Params (active)</th>
+        <th class="sortable" data-col-index="10">Context Len</th>
+        <th class="sortable" data-col-index="11">Quantization</th>
+        <th class="hw-col sortable" data-col-index="12" id="hw-col-header" style="display:none">Hardware</th>
       </tr>
     </thead>
     <tbody id="results">
@@ -439,10 +497,61 @@ def render_html(payload: dict[str, Any]) -> str:
   <p id="no-results" style="display:none">No results match selected filters.</p>
   <script>
     const fText = document.getElementById("f-text");
+    const tbody = document.getElementById("results");
     const rows = Array.from(document.querySelectorAll("#results tr"));
+    const defaultRowOrder = [...rows];
     const hwCol = document.getElementById("hw-col-header");
     const noResults = document.getElementById("no-results");
     let hwVisible = false;
+
+    // --- Sort state ---
+    let sortState = {{ col: null, dir: null }};
+    try {{
+      const stored = JSON.parse(localStorage.getItem("bakeoff_sort") || "null");
+      if (stored && typeof stored.col === "number") sortState = stored;
+    }} catch(e) {{}}
+
+    // --- Column visibility state ---
+    const COL_COUNT = 13;
+    const FILTER_TO_COL = {{ "f-family": 6, "f-arch": 7, "f-quant": 11, "f-ctx": 10, "f-params": 8 }};
+    let colVisible = {{}};
+    let colOverride = new Set();
+    try {{
+      const sv = JSON.parse(localStorage.getItem("bakeoff_col_visible") || "null");
+      if (sv && typeof sv === "object") colVisible = sv;
+      const so = JSON.parse(localStorage.getItem("bakeoff_col_override") || "null");
+      if (Array.isArray(so)) colOverride = new Set(so);
+    }} catch(e) {{}}
+    // Default: all visible
+    for (let i = 0; i < COL_COUNT; i++) {{
+      if (!(i in colVisible)) colVisible[i] = true;
+    }}
+    // Hardware column controlled separately via toggle-hw
+    colVisible[12] = hwVisible;
+
+    // --- Multi-select filter state ---
+    // filterMode: 'single' | 'multi' per filter id
+    // filterValues: array of selected values when in multi mode
+    const FILTER_IDS = ["f-family", "f-arch", "f-quant", "f-ctx", "f-params", "f-gpu", "f-vram"];
+    let filterMode = {{}};
+    let filterValues = {{}};
+    try {{
+      const fm = JSON.parse(localStorage.getItem("bakeoff_filter_mode") || "null");
+      if (fm && typeof fm === "object") filterMode = fm;
+      const fv = JSON.parse(localStorage.getItem("bakeoff_filter_values") || "null");
+      if (fv && typeof fv === "object") filterValues = fv;
+    }} catch(e) {{}}
+    FILTER_IDS.forEach(id => {{
+      if (!filterMode[id]) filterMode[id] = "single";
+      if (!filterValues[id]) filterValues[id] = [];
+    }});
+
+    function saveFilterState() {{
+      try {{
+        localStorage.setItem("bakeoff_filter_mode", JSON.stringify(filterMode));
+        localStorage.setItem("bakeoff_filter_values", JSON.stringify(filterValues));
+      }} catch(e) {{}}
+    }}
 
     // Populate dropdowns from data attributes
     function populateSelect(id, dataKey) {{
@@ -507,6 +616,94 @@ def render_html(payload: dict[str, Any]) -> str:
       }});
     }}
 
+    // Build multi-panel checkboxes from a select element's options
+    function buildMultiPanel(id) {{
+      const sel = document.getElementById(id);
+      const panel = document.getElementById("mp-" + id);
+      if (!panel) return;
+      panel.innerHTML = "";
+      // Skip first "All" option
+      Array.from(sel.options).slice(1).forEach(opt => {{
+        const lbl = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = opt.value;
+        cb.checked = filterValues[id].includes(opt.value);
+        cb.addEventListener("change", () => {{
+          if (cb.checked) {{
+            if (!filterValues[id].includes(cb.value)) filterValues[id].push(cb.value);
+          }} else {{
+            filterValues[id] = filterValues[id].filter(v => v !== cb.value);
+          }}
+          saveFilterState();
+          applyFilters();
+          renderChips();
+        }});
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(" " + opt.textContent));
+        panel.appendChild(lbl);
+      }});
+    }}
+
+    function switchToMulti(id) {{
+      filterMode[id] = "multi";
+      // Seed multi-values from current single-select value
+      const sel = document.getElementById(id);
+      if (sel.value && !filterValues[id].includes(sel.value)) {{
+        filterValues[id].push(sel.value);
+      }}
+      sel.value = "";
+      sel.style.display = "none";
+      const panel = document.getElementById("mp-" + id);
+      if (panel) {{
+        buildMultiPanel(id);
+        panel.classList.add("active");
+      }}
+      saveFilterState();
+      applyFilters();
+      renderChips();
+    }}
+
+    function switchToSingle(id) {{
+      filterMode[id] = "single";
+      filterValues[id] = [];
+      const sel = document.getElementById(id);
+      sel.value = "";
+      sel.style.display = "";
+      const panel = document.getElementById("mp-" + id);
+      if (panel) panel.classList.remove("active");
+      saveFilterState();
+      applyFilters();
+      renderChips();
+    }}
+
+    // Restore multi mode from localStorage on load
+    function restoreFilterModes() {{
+      FILTER_IDS.forEach(id => {{
+        if (filterMode[id] === "multi") {{
+          const sel = document.getElementById(id);
+          if (sel) sel.style.display = "none";
+          const panel = document.getElementById("mp-" + id);
+          if (panel) {{
+            buildMultiPanel(id);
+            panel.classList.add("active");
+          }}
+        }}
+      }});
+    }}
+
+    // "+" button click handler — toggle single/multi
+    document.querySelectorAll(".filter-add-btn").forEach(btn => {{
+      btn.addEventListener("click", () => {{
+        const id = btn.dataset.target;
+        if (filterMode[id] === "multi") {{
+          switchToSingle(id);
+        }} else {{
+          switchToMulti(id);
+        }}
+      }});
+    }});
+
     // Populate all filter dropdowns
     populateSelect("f-family", "model_family");
     populateSelect("f-arch", "architecture");
@@ -516,7 +713,32 @@ def render_html(payload: dict[str, Any]) -> str:
     populateComputed("f-gpu",    r => r.dataset.hw_arch || "");
     populateComputed("f-vram",   r => r.dataset.hw_bucket || "");
 
-    // Multi-dimensional filter
+    // Build all multi-panels after options are populated
+    FILTER_IDS.forEach(id => buildMultiPanel(id));
+    restoreFilterModes();
+
+    // Helper: get active values for a filter (works for both modes)
+    function getActiveValues(id) {{
+      if (filterMode[id] === "multi") {{
+        return filterValues[id] || [];
+      }}
+      const sel = document.getElementById(id);
+      return sel && sel.value ? [sel.value] : [];
+    }}
+
+    // Row value extractor per filter id
+    function rowValueForFilter(row, id) {{
+      if (id === "f-family") return (row.dataset.model_family || "").toLowerCase();
+      if (id === "f-arch") return (row.dataset.architecture || "").toLowerCase();
+      if (id === "f-quant") return (row.dataset.quantization || "").toLowerCase();
+      if (id === "f-ctx") return ctxRange(row.dataset.context_length || "");
+      if (id === "f-params") return paramsRange(parseParams(row.dataset.params_total || "0"));
+      if (id === "f-gpu") return (row.dataset.hw_arch || "").toLowerCase();
+      if (id === "f-vram") return row.dataset.hw_bucket || "";
+      return "";
+    }}
+
+    // Multi-dimensional filter with OR within dimension, AND across
     function applyFilters() {{
       let visible = 0;
       rows.forEach(row => {{
@@ -525,45 +747,21 @@ def render_html(payload: dict[str, Any]) -> str:
         const matchText = !query || text.includes(query);
 
         let match = true;
-        const family = document.getElementById("f-family").value;
-        if (family && (row.dataset.model_family || "").toLowerCase() !== family.toLowerCase()) match = false;
-
-        const arch = document.getElementById("f-arch").value;
-        if (arch && (row.dataset.architecture || "").toLowerCase() !== arch.toLowerCase()) match = false;
-
-        const quant = document.getElementById("f-quant").value;
-        if (quant && (row.dataset.quantization || "").toLowerCase() !== quant.toLowerCase()) match = false;
-
-        const ctx = document.getElementById("f-ctx").value;
-        if (ctx) {{
-          const rowCtx = ctxRange(row.dataset.context_length || "");
-          if (rowCtx !== "unknown" && rowCtx !== ctx) match = false;
-        }}
-
-        const params = document.getElementById("f-params").value;
-        if (params) {{
-          const p = parseParams(row.dataset.params_total || "0");
-          const r = paramsRange(p);
-          if (r !== "unknown" && r !== params) match = false;
-        }}
-
-        const gpu = document.getElementById("f-gpu").value;
-        if (gpu) {{
-          const rowArch = row.dataset.hw_arch || "unknown";
-          if (rowArch !== "unknown" && rowArch.toLowerCase() !== gpu.toLowerCase()) match = false;
-        }}
-
-        const vram = document.getElementById("f-vram").value;
-        if (vram) {{
-          const rowVram = row.dataset.hw_bucket || "unknown";
-          if (rowVram !== "unknown" && rowVram !== vram) match = false;
-        }}
+        FILTER_IDS.forEach(id => {{
+          const activeVals = getActiveValues(id);
+          if (activeVals.length === 0) return; // no filter active
+          const rowVal = rowValueForFilter(row, id);
+          // OR logic within dimension
+          const dimMatch = activeVals.some(v => rowVal === v.toLowerCase());
+          if (!dimMatch) match = false;
+        }});
 
         const visible_row = matchText && match;
         row.hidden = !visible_row;
         if (visible_row) visible++;
       }});
       noResults.style.display = visible === 0 ? "block" : "none";
+      updateAutoHide();
     }}
 
     // Hardware badge rendering
@@ -613,6 +811,7 @@ def render_html(payload: dict[str, Any]) -> str:
         const cells = r.querySelectorAll("td");
         if (cells.length > 0) cells[cells.length - 1].style.display = hwVisible ? "table-cell" : "none";
       }});
+      colVisible[12] = hwVisible;
       try {{ localStorage.setItem("hw_visible", hwVisible); }} catch(e) {{}}
     }});
     try {{
@@ -620,6 +819,167 @@ def render_html(payload: dict[str, Any]) -> str:
         document.getElementById("toggle-hw").click();
       }}
     }} catch(e) {{}}
+
+    // --- Column visibility panel (#17) ---
+    const COL_NAMES = [
+      "Run ID", "Timestamp", "Signer", "Models", "Judge Mode", "Config Hash",
+      "Model Family", "Architecture", "Params (total)", "Params (active)",
+      "Context Len", "Quantization", "Hardware"
+    ];
+
+    function saveColState() {{
+      try {{
+        localStorage.setItem("bakeoff_col_visible", JSON.stringify(colVisible));
+        localStorage.setItem("bakeoff_col_override", JSON.stringify([...colOverride]));
+      }} catch(e) {{}}
+    }}
+
+    function applyColVisibility() {{
+      const ths = document.querySelectorAll("thead th[data-col-index]");
+      ths.forEach(th => {{
+        const idx = parseInt(th.dataset.colIndex);
+        if (idx === 12) return; // hardware handled by toggle-hw
+        const show = colVisible[idx] !== false;
+        th.style.display = show ? "" : "none";
+      }});
+      rows.forEach(row => {{
+        const cells = row.querySelectorAll("td");
+        cells.forEach((td, idx) => {{
+          if (idx === 12) return; // hardware handled by toggle-hw
+          td.style.display = colVisible[idx] !== false ? "" : "none";
+        }});
+      }});
+    }}
+
+    function buildColVisPanel() {{
+      const list = document.getElementById("col-vis-list");
+      list.innerHTML = "";
+      for (let i = 0; i < COL_COUNT - 1; i++) {{ // skip hardware (12), handled by toggle
+        const lbl = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.dataset.colIdx = i;
+        cb.checked = colVisible[i] !== false;
+        cb.addEventListener("change", () => {{
+          colVisible[i] = cb.checked;
+          colOverride.add(i); // user explicitly set this column
+          saveColState();
+          applyColVisibility();
+        }});
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(" " + COL_NAMES[i]));
+        list.appendChild(lbl);
+      }}
+    }}
+
+    // Auto-hide rule: if a filter for field X is set to exactly one value (single-select), auto-hide that column
+    // unless user has explicitly overridden it
+    function updateAutoHide() {{
+      Object.entries(FILTER_TO_COL).forEach(([filterId, colIdx]) => {{
+        if (colOverride.has(colIdx)) return; // user override wins
+        const activeVals = getActiveValues(filterId);
+        const singleActive = (filterMode[filterId] === "single")
+          ? (document.getElementById(filterId) && document.getElementById(filterId).value !== "")
+          : false;
+        // Auto-hide only fires for single-select with exactly one value
+        if (singleActive) {{
+          colVisible[colIdx] = false;
+        }} else {{
+          colVisible[colIdx] = true;
+        }}
+      }});
+      saveColState();
+      applyColVisibility();
+      // Sync checkboxes in panel
+      document.querySelectorAll("#col-vis-list input[type=checkbox]").forEach(cb => {{
+        const idx = parseInt(cb.dataset.colIdx);
+        cb.checked = colVisible[idx] !== false;
+      }});
+    }}
+
+    // Gear button toggle
+    const colVisPanel = document.getElementById("col-vis-panel");
+    document.getElementById("col-vis-btn").addEventListener("click", (e) => {{
+      e.stopPropagation();
+      colVisPanel.classList.toggle("active");
+    }});
+    document.addEventListener("click", () => colVisPanel.classList.remove("active"));
+    colVisPanel.addEventListener("click", e => e.stopPropagation());
+
+    buildColVisPanel();
+    applyColVisibility();
+
+    // --- Sorting (#18) ---
+    function getCellValue(row, colIdx) {{
+      const cells = row.querySelectorAll("td");
+      if (!cells[colIdx]) return "";
+      return cells[colIdx].textContent.trim();
+    }}
+
+    function compareValues(a, b, colIdx) {{
+      // Timestamp column (1): ISO string sort
+      if (colIdx === 1) return a.localeCompare(b);
+      // Numeric columns: params total (8), context len (10)
+      if (colIdx === 8 || colIdx === 9) {{
+        const na = parseParams(a), nb = parseParams(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        if (!isNaN(na)) return -1;
+        if (!isNaN(nb)) return 1;
+        return a.localeCompare(b);
+      }}
+      if (colIdx === 10) {{
+        const ma = a.match(/([\\d]+)/), mb = b.match(/([\\d]+)/);
+        const na = ma ? parseInt(ma[1]) : NaN;
+        const nb = mb ? parseInt(mb[1]) : NaN;
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        if (!isNaN(na)) return -1;
+        if (!isNaN(nb)) return 1;
+        return a.localeCompare(b);
+      }}
+      return a.localeCompare(b);
+    }}
+
+    function applySort() {{
+      const ths = document.querySelectorAll("thead th.sortable");
+      ths.forEach(th => {{
+        th.classList.remove("sort-asc", "sort-desc");
+        if (sortState.col !== null && parseInt(th.dataset.colIndex) === sortState.col) {{
+          th.classList.add(sortState.dir === "asc" ? "sort-asc" : "sort-desc");
+        }}
+      }});
+      if (sortState.col === null || sortState.dir === null) {{
+        // Restore default order
+        defaultRowOrder.forEach(row => tbody.appendChild(row));
+        return;
+      }}
+      const col = sortState.col;
+      const dir = sortState.dir;
+      const sorted = [...rows].sort((a, b) => {{
+        const av = getCellValue(a, col);
+        const bv = getCellValue(b, col);
+        const cmp = compareValues(av, bv, col);
+        return dir === "asc" ? cmp : -cmp;
+      }});
+      sorted.forEach(row => tbody.appendChild(row));
+    }}
+
+    document.querySelectorAll("thead th.sortable").forEach(th => {{
+      th.addEventListener("click", () => {{
+        const col = parseInt(th.dataset.colIndex);
+        if (sortState.col === col) {{
+          if (sortState.dir === "asc") sortState.dir = "desc";
+          else if (sortState.dir === "desc") {{ sortState.col = null; sortState.dir = null; }}
+          else {{ sortState.dir = "asc"; }}
+        }} else {{
+          sortState.col = col;
+          sortState.dir = "asc";
+        }}
+        try {{ localStorage.setItem("bakeoff_sort", JSON.stringify(sortState)); }} catch(e) {{}}
+        applySort();
+      }});
+    }});
+
+    applySort();
 
     // Collapsible filter bar
     const filterRowsWrap = document.getElementById("filter-rows-wrap");
@@ -640,15 +1000,19 @@ def render_html(payload: dict[str, Any]) -> str:
       filterChipStrip.innerHTML = "";
       const expanded = filterRowsWrap.style.display !== "none";
       if (expanded) return;
-      Object.keys(FILTER_LABELS).forEach(id => {{
-        const sel = document.getElementById(id);
-        if (!sel || !sel.value) return;
+      FILTER_IDS.forEach(id => {{
+        const activeVals = getActiveValues(id);
+        if (activeVals.length === 0) return;
         const chip = document.createElement("span");
         chip.className = "filter-chip";
         const label = document.createElement("span");
         label.textContent = FILTER_LABELS[id] + ": ";
         const val = document.createElement("strong");
-        val.textContent = sel.options[sel.selectedIndex].text;
+        if (filterMode[id] === "multi" && activeVals.length > 1) {{
+          val.textContent = "[" + activeVals.length + " selected]";
+        }} else {{
+          val.textContent = activeVals[0];
+        }}
         chip.appendChild(label);
         chip.appendChild(val);
         const clearBtn = document.createElement("button");
@@ -656,7 +1020,12 @@ def render_html(payload: dict[str, Any]) -> str:
         clearBtn.textContent = "×";
         clearBtn.title = "Clear " + FILTER_LABELS[id];
         clearBtn.addEventListener("click", () => {{
-          sel.value = "";
+          if (filterMode[id] === "multi") {{
+            switchToSingle(id);
+          }} else {{
+            const sel = document.getElementById(id);
+            if (sel) sel.value = "";
+          }}
           applyFilters();
           renderChips();
         }});
@@ -685,12 +1054,31 @@ def render_html(payload: dict[str, Any]) -> str:
     }} catch(e) {{}}
     setFilterBarExpanded(initExpanded);
 
-    // Bind all filter inputs
-    ["f-family", "f-arch", "f-quant", "f-ctx", "f-params", "f-gpu", "f-vram", "f-text"].forEach(id => {{
-      const el = document.getElementById(id);
-      el.addEventListener("input", () => {{ applyFilters(); renderChips(); }});
-      el.addEventListener("change", () => {{ applyFilters(); renderChips(); }});
+    // Clear all filters
+    document.getElementById("clear-all-filters").addEventListener("click", () => {{
+      FILTER_IDS.forEach(id => {{
+        if (filterMode[id] === "multi") {{
+          switchToSingle(id);
+        }} else {{
+          const sel = document.getElementById(id);
+          if (sel) sel.value = "";
+        }}
+      }});
+      fText.value = "";
+      applyFilters();
+      renderChips();
     }});
+
+    // Bind single-select filter inputs
+    FILTER_IDS.forEach(id => {{
+      const el = document.getElementById(id);
+      if (el) {{
+        el.addEventListener("input", () => {{ applyFilters(); renderChips(); }});
+        el.addEventListener("change", () => {{ applyFilters(); renderChips(); }});
+      }}
+    }});
+    fText.addEventListener("input", () => {{ applyFilters(); renderChips(); }});
+    fText.addEventListener("change", () => {{ applyFilters(); renderChips(); }});
 
     applyFilters();
     renderBadges();
