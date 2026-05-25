@@ -356,7 +356,7 @@ def render_html(payload: dict[str, Any]) -> str:
         cells_html = "".join(f"<td>{html.escape(str(cell))}</td>" for cell in plain_cells)
         # Similar Results column (hidden by default — JS will populate badge content)
         cells_html += '<td class="similar-results-col" style="display:none"></td>'
-        cells_html += f"<td class='hw-col-td'>{_hw_cell_html(hw)}</td>"
+        cells_html += f"<td class='hw-col-td' style='display:none'>{_hw_cell_html(hw)}</td>"
 
         # Config hash in per-row Actions menu (⋮ button)
         cfg_escaped = html.escape(config_hash, quote=True)
