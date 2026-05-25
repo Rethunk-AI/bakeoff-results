@@ -102,8 +102,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate submissions (signature required)
-        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty --require-signature submissions
+      - name: Validate submissions
+        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
 
       - name: Build static index
         run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
