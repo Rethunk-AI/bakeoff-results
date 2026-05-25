@@ -25,7 +25,7 @@
     .filter-chip-clear { background: none; border: none; cursor: pointer; color: #0969da; font-size: 1em; padding: 0; line-height: 1; margin-left: 2px; }
     .filter-chip-clear:hover { color: #cf222e; }
     .filter-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
-    .filter-group { flex: 1; min-width: 150px; }
+    .filter-group { flex: 1; min-width: 150px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.4rem 0.6rem; }
     .filter-group label { display: block; font-size: 0.85em; margin-bottom: 0.25rem; }
     .filter-group-controls { display: flex; align-items: center; gap: 0.25rem; }
     .filter-group-controls select { flex: 1; margin: 0; }
@@ -51,14 +51,14 @@
     .col-vis-panel input[type=checkbox] { width: auto; margin: 0; padding: 0; }
     .col-vis-panel hr { margin: 0.4rem 0; border: none; border-top: 1px solid #eee; }
     /* Range slider styles */
-    .slider-group { flex: 1; min-width: 180px; }
+    .slider-group { flex: 1; min-width: 180px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.4rem 0.6rem; }
     .slider-group label { font-size: 0.85em; }
     .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
     .slider-range-lbl { font-size: 0.8em; color: #555; white-space: nowrap; }
     .dual-slider { position: relative; height: 24px; }
     .dual-track { position: absolute; top: 10px; height: 4px; width: 100%; border-radius: 2px; pointer-events: none; background: #ddd; }
     .dual-thumb { position: absolute; width: 100%; height: 4px; top: 10px; background: transparent; pointer-events: none; -webkit-appearance: none; appearance: none; outline: none; margin: 0; padding: 0; }
-    .dual-thumb::-webkit-slider-thumb { pointer-events: all; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); margin-top: -6px; }
+    .dual-thumb::-webkit-slider-thumb { pointer-events: all; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); margin-top: -4px; }
     .dual-thumb::-moz-range-thumb { pointer-events: all; width: 12px; height: 12px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; }
     .dual-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(66,133,244,.3); }
     .actions-cell { position: relative; padding: 0.2rem 0.3rem; text-align: center; white-space: nowrap; }
@@ -73,7 +73,7 @@
 </head>
 <body>
   <h1>Rethunk Bakeoff Results</h1>
-  <p>Generated at 2026-05-25T12:31:14+00:00. This static index is backed by validated
+  <p>Generated at 2026-05-25T13:28:35+00:00. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar">
     <div class="filter-bar-header">
@@ -297,11 +297,14 @@
       vramMin.value = sliderState.vramMin;
       vramMax.value = sliderState.vramMax;
 
-      function onSliderChange() {
-        // Enforce min <= max (clamp, don't swap)
-        if (parseInt(paramsMin.value) > parseInt(paramsMax.value)) paramsMax.value = paramsMin.value;
-        if (parseInt(ctxMin.value) > parseInt(ctxMax.value)) ctxMax.value = ctxMin.value;
-        if (parseInt(vramMin.value) > parseInt(vramMax.value)) vramMax.value = vramMin.value;
+      function onSliderChange(e) {
+        // Source-aware clamp: min stops at max, max stops at min
+        if (e.target === paramsMin && parseInt(paramsMin.value) > parseInt(paramsMax.value)) paramsMin.value = paramsMax.value;
+        if (e.target === paramsMax && parseInt(paramsMin.value) > parseInt(paramsMax.value)) paramsMax.value = paramsMin.value;
+        if (e.target === ctxMin && parseInt(ctxMin.value) > parseInt(ctxMax.value)) ctxMin.value = ctxMax.value;
+        if (e.target === ctxMax && parseInt(ctxMin.value) > parseInt(ctxMax.value)) ctxMax.value = ctxMin.value;
+        if (e.target === vramMin && parseInt(vramMin.value) > parseInt(vramMax.value)) vramMin.value = vramMax.value;
+        if (e.target === vramMax && parseInt(vramMin.value) > parseInt(vramMax.value)) vramMax.value = vramMin.value;
         sliderState.paramsMin = parseInt(paramsMin.value);
         sliderState.paramsMax = parseInt(paramsMax.value);
         sliderState.ctxMin = parseInt(ctxMin.value);
