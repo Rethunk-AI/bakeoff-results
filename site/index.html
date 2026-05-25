@@ -52,11 +52,15 @@
     .col-vis-panel hr { margin: 0.4rem 0; border: none; border-top: 1px solid #eee; }
     /* Range slider styles */
     .slider-group { flex: 1; min-width: 180px; }
-    .slider-group label { display: block; font-size: 0.85em; margin-bottom: 0.25rem; }
-    .slider-wrap { display: flex; flex-direction: column; gap: 0.3rem; }
-    .slider-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8em; }
-    .slider-row input[type=range] { flex: 1; margin: 0; padding: 0; max-width: none; width: auto; height: 4px; cursor: pointer; }
-    .slider-row span { min-width: 3.5rem; text-align: right; color: #555; white-space: nowrap; }
+    .slider-group label { font-size: 0.85em; }
+    .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
+    .slider-range-lbl { font-size: 0.8em; color: #555; white-space: nowrap; }
+    .dual-slider { position: relative; height: 24px; }
+    .dual-track { position: absolute; top: 10px; height: 4px; width: 100%; border-radius: 2px; pointer-events: none; background: #ddd; }
+    .dual-thumb { position: absolute; width: 100%; height: 4px; top: 10px; background: transparent; pointer-events: none; -webkit-appearance: none; appearance: none; outline: none; margin: 0; padding: 0; }
+    .dual-thumb::-webkit-slider-thumb { pointer-events: all; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); margin-top: -6px; }
+    .dual-thumb::-moz-range-thumb { pointer-events: all; width: 12px; height: 12px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; }
+    .dual-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(66,133,244,.3); }
     .actions-cell { position: relative; padding: 0.2rem 0.3rem; text-align: center; white-space: nowrap; }
     .actions-btn { background: none; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; padding: 1px 7px; font-size: 1rem; line-height: 1.4; color: #555; }
     .actions-btn:hover { background: #e8eaed; }
@@ -69,7 +73,7 @@
 </head>
 <body>
   <h1>Rethunk Bakeoff Results</h1>
-  <p>Generated at 2026-05-25T10:07:18+00:00. This static index is backed by validated
+  <p>Generated at 2026-05-25T11:58:11+00:00. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar">
     <div class="filter-bar-header">
@@ -126,52 +130,40 @@
         </div>
       </div>
       <div class="filter-row">
-        <!-- Params slider (log-scale, data-driven snap points) -->
+        <!-- Params dual-handle slider (log-scale, data-driven snap points) -->
         <div class="slider-group">
-          <label>Total Params (B)</label>
-          <div class="slider-wrap">
-            <div class="slider-row">
-              <span>Min:</span>
-              <input type="range" id="params-min" min="0" max="6" step="1" value="0">
-              <span id="params-min-lbl">0B</span>
-            </div>
-            <div class="slider-row">
-              <span>Max:</span>
-              <input type="range" id="params-max" min="0" max="6" step="1" value="6">
-              <span id="params-max-lbl">70B</span>
-            </div>
+          <div class="slider-header">
+            <label>Total Params (B)</label>
+            <span id="params-range-lbl" class="slider-range-lbl">0B – 70B</span>
+          </div>
+          <div class="dual-slider">
+            <div class="dual-track" id="params-track"></div>
+            <input type="range" class="dual-thumb" id="params-min" min="0" max="6" step="1" value="0">
+            <input type="range" class="dual-thumb" id="params-max" min="0" max="6" step="1" value="6">
           </div>
         </div>
-        <!-- Context slider (powers-of-2: 4K, 8K, 16K, 32K, 128K+) -->
+        <!-- Context dual-handle slider (powers-of-2: 4K, 8K, 16K, 32K, 128K+) -->
         <div class="slider-group">
-          <label>Context Length</label>
-          <div class="slider-wrap">
-            <div class="slider-row">
-              <span>Min:</span>
-              <input type="range" id="ctx-min" min="0" max="4" step="1" value="0">
-              <span id="ctx-min-lbl">4K</span>
-            </div>
-            <div class="slider-row">
-              <span>Max:</span>
-              <input type="range" id="ctx-max" min="0" max="4" step="1" value="4">
-              <span id="ctx-max-lbl">128K+</span>
-            </div>
+          <div class="slider-header">
+            <label>Context Length</label>
+            <span id="ctx-range-lbl" class="slider-range-lbl">4K – 128K+</span>
+          </div>
+          <div class="dual-slider">
+            <div class="dual-track" id="ctx-track"></div>
+            <input type="range" class="dual-thumb" id="ctx-min" min="0" max="4" step="1" value="0">
+            <input type="range" class="dual-thumb" id="ctx-max" min="0" max="4" step="1" value="4">
           </div>
         </div>
-        <!-- VRAM slider (GB ranges: 0-8, 8-16, 16-24, 24-40, 40+) -->
+        <!-- VRAM dual-handle slider (GB ranges: 0-8, 8-16, 16-24, 24-40, 40+) -->
         <div class="slider-group">
-          <label>VRAM (GB)</label>
-          <div class="slider-wrap">
-            <div class="slider-row">
-              <span>Min:</span>
-              <input type="range" id="vram-min" min="0" max="4" step="1" value="0">
-              <span id="vram-min-lbl">0 GB</span>
-            </div>
-            <div class="slider-row">
-              <span>Max:</span>
-              <input type="range" id="vram-max" min="0" max="4" step="1" value="4">
-              <span id="vram-max-lbl">40+ GB</span>
-            </div>
+          <div class="slider-header">
+            <label>VRAM (GB)</label>
+            <span id="vram-range-lbl" class="slider-range-lbl">0 GB – 40+ GB</span>
+          </div>
+          <div class="dual-slider">
+            <div class="dual-track" id="vram-track"></div>
+            <input type="range" class="dual-thumb" id="vram-min" min="0" max="4" step="1" value="0">
+            <input type="range" class="dual-thumb" id="vram-max" min="0" max="4" step="1" value="4">
           </div>
         </div>
       </div>
@@ -268,6 +260,27 @@
       try { localStorage.setItem("bakeoff_sliders", JSON.stringify(sliderState)); } catch(e) {}
     }
 
+    function updateTrack(trackEl, minEl, maxEl) {
+      const lo = parseInt(minEl.value) / parseInt(minEl.max);
+      const hi = parseInt(maxEl.value) / parseInt(maxEl.max);
+      trackEl.style.background = "linear-gradient(to right, #ddd " + (lo*100).toFixed(1) + "%, #4285f4 " + (lo*100).toFixed(1) + "%, #4285f4 " + (hi*100).toFixed(1) + "%, #ddd " + (hi*100).toFixed(1) + "%)";
+    }
+
+    function updateSliderLabels() {
+      document.getElementById("params-range-lbl").textContent =
+        PARAMS_LABELS[sliderState.paramsMin] + " – " + PARAMS_LABELS[sliderState.paramsMax];
+      document.getElementById("ctx-range-lbl").textContent =
+        CTX_LABELS[sliderState.ctxMin] + " – " + CTX_LABELS[sliderState.ctxMax];
+      document.getElementById("vram-range-lbl").textContent =
+        VRAM_LABELS[sliderState.vramMin] + " – " + VRAM_LABELS[sliderState.vramMax];
+      updateTrack(document.getElementById("params-track"),
+        document.getElementById("params-min"), document.getElementById("params-max"));
+      updateTrack(document.getElementById("ctx-track"),
+        document.getElementById("ctx-min"), document.getElementById("ctx-max"));
+      updateTrack(document.getElementById("vram-track"),
+        document.getElementById("vram-min"), document.getElementById("vram-max"));
+    }
+
     // Wire up sliders
     function initSliders() {
       const paramsMin = document.getElementById("params-min");
@@ -284,17 +297,8 @@
       vramMin.value = sliderState.vramMin;
       vramMax.value = sliderState.vramMax;
 
-      function updateSliderLabels() {
-        document.getElementById("params-min-lbl").textContent = PARAMS_LABELS[parseInt(paramsMin.value)];
-        document.getElementById("params-max-lbl").textContent = PARAMS_LABELS[parseInt(paramsMax.value)];
-        document.getElementById("ctx-min-lbl").textContent = CTX_LABELS[parseInt(ctxMin.value)];
-        document.getElementById("ctx-max-lbl").textContent = CTX_LABELS[parseInt(ctxMax.value)];
-        document.getElementById("vram-min-lbl").textContent = VRAM_LABELS[parseInt(vramMin.value)];
-        document.getElementById("vram-max-lbl").textContent = VRAM_LABELS[parseInt(vramMax.value)];
-      }
-
       function onSliderChange() {
-        // Enforce min <= max
+        // Enforce min <= max (clamp, don't swap)
         if (parseInt(paramsMin.value) > parseInt(paramsMax.value)) paramsMax.value = paramsMin.value;
         if (parseInt(ctxMin.value) > parseInt(ctxMax.value)) ctxMax.value = ctxMin.value;
         if (parseInt(vramMin.value) > parseInt(vramMax.value)) vramMax.value = vramMin.value;
@@ -496,9 +500,10 @@
     function rowMatchesCtxSlider(row) {
       const raw = row.dataset.context_length || "";
       if (!raw || raw === "unknown") return true;
-      const m = raw.match(/([\d]+)/);
+      const m = raw.match(/([\d.]+)\s*([Kk]?)/);
       if (!m) return true;
-      const v = parseInt(m[1]);
+      let v = parseFloat(m[1]);
+      if (m[2].toLowerCase() === "k") v *= 1024;
       const lo = CTX_SNAPS[sliderState.ctxMin];
       const hi = CTX_SNAPS[sliderState.ctxMax];
       return v >= lo && (sliderState.ctxMax === CTX_SNAPS.length - 1 || v <= hi);
@@ -868,13 +873,7 @@
       document.getElementById("vram-min").value = 0;
       document.getElementById("vram-max").value = VRAM_SNAPS.length - 1;
       sliderState = { paramsMin: 0, paramsMax: 6, ctxMin: 0, ctxMax: CTX_SNAPS.length - 1, vramMin: 0, vramMax: VRAM_SNAPS.length - 1 };
-      // Re-update labels
-      document.getElementById("params-min-lbl").textContent = PARAMS_LABELS[0];
-      document.getElementById("params-max-lbl").textContent = PARAMS_LABELS[PARAMS_LABELS.length - 1];
-      document.getElementById("ctx-min-lbl").textContent = CTX_LABELS[0];
-      document.getElementById("ctx-max-lbl").textContent = CTX_LABELS[CTX_LABELS.length - 1];
-      document.getElementById("vram-min-lbl").textContent = VRAM_LABELS[0];
-      document.getElementById("vram-max-lbl").textContent = VRAM_LABELS[VRAM_LABELS.length - 1];
+      updateSliderLabels();
       saveSliderState();
       applyFilters();
       renderChips();
