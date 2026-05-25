@@ -287,51 +287,30 @@ def _hw_cell_html(hw: Any) -> str:
 
 
 def _params_snap_points(entries: list[dict[str, Any]]) -> list[int]:
-    """Data-driven, whole-number log-scale snap points for the params slider.
+    """Data-driven whole-number snap points for the params range slider.
 
-    Coarser grouping at higher magnitudes (1B steps < 10B, 5B steps < 100B,
-    50B steps beyond). Adds one intermediate stop between each adjacent data
-    value pair and one stop above the maximum.
+    One stop per data value (rounded to nearest integer), one midpoint between
+    adjacent stops, one stop above the max. No fixed-resolution tiers.
     """
     def _extract(e: dict[str, Any]) -> float | None:
         p = str(e.get("params_total") or "")
         m = re.search(r"([\d.]+)", p)
         return float(m.group(1)) if m else None
 
-    def _quantize(v: float) -> int:
-        if v <= 0:
-            return 0
-        if v < 10:
-            return max(1, round(v))
-        if v < 100:
-            return round(v / 5) * 5
-        if v < 500:
-            return round(v / 50) * 50
-        return round(v / 100) * 100
-
     raw = [_extract(e) for e in entries]
-    vals = sorted(set(_quantize(v) for v in raw if v is not None))
+    vals = sorted({max(1, round(v)) for v in raw if v is not None})
     if not vals:
-        return [1, 3, 7, 13, 30, 70, 400]
+        return [0, 1, 3, 7, 13, 30, 70]
 
-    stops: list[int] = [0]
-    for i, a in enumerate(vals):
-        if a not in stops:
-            stops.append(a)
-        if i + 1 < len(vals):
-            mid = _quantize((a + vals[i + 1]) / 2)
-            if mid not in stops and mid != a and mid != vals[i + 1]:
-                stops.append(mid)
+    stops: set[int] = {0}
+    stops.update(vals)
+    for a, b in zip(vals, vals[1:]):
+        mid = (a + b) // 2
+        if a < mid < b:
+            stops.add(mid)
+    stops.add(max(vals[-1] + 1, round(vals[-1] * 1.5)))
 
-    top = vals[-1]
-    if top < 10:
-        stops.append(top + 1)
-    elif top < 100:
-        stops.append(_quantize(top * 1.5))
-    else:
-        stops.append(_quantize(top * 1.5))
-
-    return sorted(set(stops))
+    return sorted(stops)
 
 
 def _fmt_params(v: int) -> str:
