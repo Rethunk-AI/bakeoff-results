@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -285,9 +286,72 @@ def _hw_cell_html(hw: Any) -> str:
     return " · ".join(parts) if parts else html.escape(str(hw))
 
 
+def _params_snap_points(entries: list[dict[str, Any]]) -> list[int]:
+    """Data-driven, whole-number log-scale snap points for the params slider.
+
+    Coarser grouping at higher magnitudes (1B steps < 10B, 5B steps < 100B,
+    50B steps beyond). Adds one intermediate stop between each adjacent data
+    value pair and one stop above the maximum.
+    """
+    def _extract(e: dict[str, Any]) -> float | None:
+        p = str(e.get("params_total") or "")
+        m = re.search(r"([\d.]+)", p)
+        return float(m.group(1)) if m else None
+
+    def _quantize(v: float) -> int:
+        if v <= 0:
+            return 0
+        if v < 10:
+            return max(1, round(v))
+        if v < 100:
+            return round(v / 5) * 5
+        if v < 500:
+            return round(v / 50) * 50
+        return round(v / 100) * 100
+
+    raw = [_extract(e) for e in entries]
+    vals = sorted(set(_quantize(v) for v in raw if v is not None))
+    if not vals:
+        return [1, 3, 7, 13, 30, 70, 400]
+
+    stops: list[int] = [0]
+    for i, a in enumerate(vals):
+        if a not in stops:
+            stops.append(a)
+        if i + 1 < len(vals):
+            mid = _quantize((a + vals[i + 1]) / 2)
+            if mid not in stops and mid != a and mid != vals[i + 1]:
+                stops.append(mid)
+
+    top = vals[-1]
+    if top < 10:
+        stops.append(top + 1)
+    elif top < 100:
+        stops.append(_quantize(top * 1.5))
+    else:
+        stops.append(_quantize(top * 1.5))
+
+    return sorted(set(stops))
+
+
+def _fmt_params(v: int) -> str:
+    if v == 0:
+        return "0B"
+    if v < 1000:
+        return f"{v}B"
+    return f"{v // 1000}TB"
+
+
 def render_html(payload: dict[str, Any]) -> str:
+    entries = payload["entries"]
+    params_snaps = _params_snap_points(entries)
+    params_labels = [_fmt_params(v) for v in params_snaps]
+    params_snaps_js = json.dumps(params_snaps)
+    params_labels_js = json.dumps(params_labels)
+    params_max_idx = len(params_snaps) - 1
+
     rows = []
-    for entry in payload["entries"]:
+    for entry in entries:
         model_ids = ", ".join(entry.get("model_ids") or [])
         config_hash = entry.get("config_hash") or ""
         hw = entry.get("hardware") or "unknown"
@@ -315,20 +379,19 @@ def render_html(payload: dict[str, Any]) -> str:
         cells_html += '<td class="similar-results-col" style="display:none"></td>'
         cells_html += f"<td class='hw-col-td'>{_hw_cell_html(hw)}</td>"
 
-        # Config hash in a detail row (click-to-copy)
+        # Config hash in per-row Actions menu (⋮ button)
         cfg_escaped = html.escape(config_hash, quote=True)
-        detail_html = ""
         if config_hash:
-            detail_html = (
-                f'<tr class="row-detail" style="display:none">'
-                f'<td colspan="14" style="background:#f6f8fa;padding:0.4rem 0.75rem;font-size:0.85em">'
-                f'Config hash: <code id="cfg-{cfg_escaped[:8]}" style="font-size:0.95em">{html.escape(config_hash)}</code>'
-                f'<button class="copy-btn" data-copy="{cfg_escaped}" '
-                f'style="margin-left:0.5rem;padding:1px 6px;font-size:0.8em;cursor:pointer;'
-                f'background:#f6f8fa;border:1px solid #ccc;border-radius:3px" '
-                f'title="Copy config hash">copy</button>'
-                f'</td></tr>'
+            actions_cell = (
+                f'<td class="actions-cell">'
+                f'<button class="actions-btn" title="Row actions">&#8942;</button>'
+                f'<div class="actions-menu">'
+                f'<button class="actions-menu-item" data-copy="{cfg_escaped}">Copy config hash</button>'
+                f'</div>'
+                f'</td>'
             )
+        else:
+            actions_cell = '<td class="actions-cell"></td>'
 
         # Build data attributes for filtering
         data = {
@@ -344,7 +407,7 @@ def render_html(payload: dict[str, Any]) -> str:
         }
         str_data = {k: str(v) for k, v in data.items()}
         attrs = " ".join(f'data-{k}="{html.escape(v, quote=True)}"' for k, v in str_data.items())
-        rows.append(f"<tr class='data-row' {attrs}>{cells_html}</tr>{detail_html}")
+        rows.append(f"<tr class='data-row' {attrs}>{cells_html}{actions_cell}</tr>")
 
     generated_at = html.escape(str(payload["generated_at"]))
     body_rows = "\n".join(rows) if rows else (
@@ -409,6 +472,13 @@ def render_html(payload: dict[str, Any]) -> str:
     .slider-row {{ display: flex; align-items: center; gap: 0.5rem; font-size: 0.8em; }}
     .slider-row input[type=range] {{ flex: 1; margin: 0; padding: 0; max-width: none; width: auto; height: 4px; cursor: pointer; }}
     .slider-row span {{ min-width: 3.5rem; text-align: right; color: #555; white-space: nowrap; }}
+    .actions-cell {{ position: relative; padding: 0.2rem 0.3rem; text-align: center; white-space: nowrap; }}
+    .actions-btn {{ background: none; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; padding: 1px 7px; font-size: 1rem; line-height: 1.4; color: #555; }}
+    .actions-btn:hover {{ background: #e8eaed; }}
+    .actions-menu {{ position: absolute; right: 0; z-index: 200; background: #fff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 0.25rem 0; min-width: 180px; display: none; }}
+    .actions-menu.open {{ display: block; }}
+    .actions-menu-item {{ display: block; width: 100%; text-align: left; padding: 0.4rem 0.75rem; background: none; border: none; cursor: pointer; font-size: 0.85em; color: #222; white-space: nowrap; }}
+    .actions-menu-item:hover {{ background: #f6f8fa; }}
     @media (max-width: 768px) {{ .filter-row {{ flex-direction: column; }} }}
   </style>
 </head>
@@ -471,19 +541,19 @@ def render_html(payload: dict[str, Any]) -> str:
         </div>
       </div>
       <div class="filter-row">
-        <!-- Params slider (log-scale snap: 1, 3, 7, 13, 30, 70, 400 B) -->
+        <!-- Params slider (log-scale, data-driven snap points) -->
         <div class="slider-group">
           <label>Total Params (B)</label>
           <div class="slider-wrap">
             <div class="slider-row">
               <span>Min:</span>
-              <input type="range" id="params-min" min="0" max="6" step="1" value="0">
-              <span id="params-min-lbl">1B</span>
+              <input type="range" id="params-min" min="0" max="{params_max_idx}" step="1" value="0">
+              <span id="params-min-lbl">{params_labels[0]}</span>
             </div>
             <div class="slider-row">
               <span>Max:</span>
-              <input type="range" id="params-max" min="0" max="6" step="1" value="6">
-              <span id="params-max-lbl">400B</span>
+              <input type="range" id="params-max" min="0" max="{params_max_idx}" step="1" value="{params_max_idx}">
+              <span id="params-max-lbl">{params_labels[-1]}</span>
             </div>
           </div>
         </div>
@@ -545,6 +615,7 @@ def render_html(payload: dict[str, Any]) -> str:
         <th class="sortable" data-col-index="10">Quantization</th>
         <th class="sortable" data-col-index="11" id="similar-col-header" style="display:none">Similar Results</th>
         <th class="hw-col sortable" data-col-index="12" id="hw-col-header" style="display:none">Hardware</th>
+        <th class="actions-th" style="width:2rem"></th>
       </tr>
     </thead>
     <tbody id="results">
@@ -563,9 +634,9 @@ def render_html(payload: dict[str, Any]) -> str:
     const noResults = document.getElementById("no-results");
     let hwVisible = false;
 
-    // --- Params snap points ---
-    const PARAMS_SNAPS = [1, 3, 7, 13, 30, 70, 400];
-    const PARAMS_LABELS = ["1B", "3B", "7B", "13B", "30B", "70B", "400B"];
+    // --- Params snap points (data-driven, injected by build_index) ---
+    const PARAMS_SNAPS = {params_snaps_js};
+    const PARAMS_LABELS = {params_labels_js};
     const CTX_SNAPS = [4096, 8192, 16384, 32768, 131072];
     const CTX_LABELS = ["4K", "8K", "16K", "32K", "128K+"];
     // VRAM GB range boundaries: index → lower bound (GB); index 4 = 40+
@@ -600,7 +671,7 @@ def render_html(payload: dict[str, Any]) -> str:
     colVisible[12] = hwVisible;
 
     // --- Slider state ---
-    let sliderState = {{ paramsMin: 0, paramsMax: 6, ctxMin: 0, ctxMax: 4, vramMin: 0, vramMax: 4 }};
+    let sliderState = {{ paramsMin: 0, paramsMax: {params_max_idx}, ctxMin: 0, ctxMax: 4, vramMin: 0, vramMax: 4 }};
     try {{
       const ss = JSON.parse(localStorage.getItem("bakeoff_sliders") || "null");
       if (ss && typeof ss === "object") sliderState = Object.assign(sliderState, ss);
@@ -879,11 +950,6 @@ def render_html(payload: dict[str, Any]) -> str:
 
         const visibleRow = matchText && match;
         row.hidden = !visibleRow;
-        // Also toggle the adjacent detail row
-        const next = row.nextElementSibling;
-        if (next && next.classList.contains("row-detail")) {{
-          if (!visibleRow) next.style.display = "none";
-        }}
         if (visibleRow) visibleCount++;
       }});
       noResults.style.display = visibleCount === 0 ? "block" : "none";
@@ -1209,12 +1275,12 @@ def render_html(payload: dict[str, Any]) -> str:
       fText.value = "";
       // Reset sliders
       document.getElementById("params-min").value = 0;
-      document.getElementById("params-max").value = PARAMS_SNAPS.length - 1;
+      document.getElementById("params-max").value = {params_max_idx};
       document.getElementById("ctx-min").value = 0;
       document.getElementById("ctx-max").value = CTX_SNAPS.length - 1;
       document.getElementById("vram-min").value = 0;
       document.getElementById("vram-max").value = VRAM_SNAPS.length - 1;
-      sliderState = {{ paramsMin: 0, paramsMax: PARAMS_SNAPS.length - 1, ctxMin: 0, ctxMax: CTX_SNAPS.length - 1, vramMin: 0, vramMax: VRAM_SNAPS.length - 1 }};
+      sliderState = {{ paramsMin: 0, paramsMax: {params_max_idx}, ctxMin: 0, ctxMax: CTX_SNAPS.length - 1, vramMin: 0, vramMax: VRAM_SNAPS.length - 1 }};
       // Re-update labels
       document.getElementById("params-min-lbl").textContent = PARAMS_LABELS[0];
       document.getElementById("params-max-lbl").textContent = PARAMS_LABELS[PARAMS_LABELS.length - 1];
@@ -1238,36 +1304,35 @@ def render_html(payload: dict[str, Any]) -> str:
     fText.addEventListener("input", () => {{ applyFilters(); renderChips(); }});
     fText.addEventListener("change", () => {{ applyFilters(); renderChips(); }});
 
-    // --- Row expand for config hash click-to-copy ---
-    rows.forEach(row => {{
-      const cfgHash = row.dataset.config_hash;
-      if (!cfgHash) return;
-      row.style.cursor = "pointer";
-      row.title = "Click to show config hash";
-      row.addEventListener("click", (e) => {{
-        // Don't trigger on copy button itself
-        if (e.target.classList.contains("copy-btn")) return;
-        const next = row.nextElementSibling;
-        if (next && next.classList.contains("row-detail")) {{
-          const isHidden = next.style.display === "none" || next.style.display === "";
-          next.style.display = isHidden ? "table-row" : "none";
-        }}
-      }});
-    }});
-
-    // Click-to-copy config hash
+    // --- Actions menu (⋮ per row) ---
     document.addEventListener("click", (e) => {{
-      if (!e.target.classList.contains("copy-btn")) return;
-      const text = e.target.dataset.copy;
-      if (!text) return;
-      navigator.clipboard.writeText(text).then(() => {{
-        const orig = e.target.textContent;
-        e.target.textContent = "copied!";
-        setTimeout(() => {{ e.target.textContent = orig; }}, 1200);
-      }}).catch(() => {{
-        e.target.textContent = "failed";
-        setTimeout(() => {{ e.target.textContent = "copy"; }}, 1200);
-      }});
+      if (e.target.closest(".actions-btn")) {{
+        const btn = e.target.closest(".actions-btn");
+        const targetMenu = btn.nextElementSibling;
+        const wasOpen = targetMenu && targetMenu.classList.contains("open");
+        document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
+        if (targetMenu && !wasOpen) targetMenu.classList.add("open");
+        return;
+      }}
+      if (e.target.closest(".actions-menu-item")) {{
+        const item = e.target.closest(".actions-menu-item");
+        const text = item.dataset.copy;
+        if (text) {{
+          navigator.clipboard.writeText(text).then(() => {{
+            const orig = item.textContent;
+            item.textContent = "Copied!";
+            setTimeout(() => {{ item.textContent = orig; }}, 1200);
+          }}).catch(() => {{
+            item.textContent = "Failed";
+            setTimeout(() => {{ item.textContent = "Copy config hash"; }}, 1200);
+          }});
+        }}
+        item.closest(".actions-menu").classList.remove("open");
+        return;
+      }}
+      if (!e.target.closest(".actions-menu")) {{
+        document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
+      }}
     }});
 
     initSliders();
