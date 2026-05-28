@@ -409,12 +409,15 @@ def render_html(payload: dict[str, Any]) -> str:
     th.sort-asc::after {{ content: " ▲"; font-size: 0.8em; color: #0969da; }}
     th.sort-desc::after {{ content: " ▼"; font-size: 0.8em; color: #0969da; }}
     .filter-bar {{ margin: 1rem 0 0 0; padding: .4rem .8rem; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee; }}
-    .filter-bar-header {{ display: flex; justify-content: space-between; align-items: center; }}
-    .filter-bar-header-left {{ display: flex; align-items: center; gap: 0.5rem; }}
-    .filter-chevron {{ background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.1rem 0.4rem; border-radius: 3px; color: #444; line-height: 1; }}
+    .filter-bar-header {{ display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }}
+    .filter-chevron {{ background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 0.1rem 0.3rem; border-radius: 3px; color: #444; line-height: 1; flex-shrink: 0; }}
     .filter-chevron:hover {{ background: #e8eaed; }}
+    .filter-bar-title {{ background: none; border: none; cursor: pointer; font-weight: bold; font-size: 1em; padding: 0; color: inherit; white-space: nowrap; flex-shrink: 0; }}
+    .filter-bar-title:hover {{ text-decoration: underline; }}
+    .filter-bar.fb-expanded .clear-all-btn {{ display: inline-block !important; }}
+    .filter-bar:not(.fb-expanded) .filter-rows-wrap {{ display: none; }}
     .filter-rows-wrap {{ margin-top: 0.4rem; }}
-    .filter-chip-strip {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }}
+    .filter-chip-strip {{ display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; min-width: 0; }}
     .filter-chip {{ display: inline-flex; align-items: center; gap: 0.3rem; background: #ddf4ff; color: #0969da; border: 1px solid #b6daff; border-radius: 12px; padding: 2px 10px; font-size: 0.8em; }}
     .filter-chip-clear {{ background: none; border: none; cursor: pointer; color: #0969da; font-size: 1em; padding: 0; line-height: 1; margin-left: 2px; }}
     .filter-chip-clear:hover {{ color: #cf222e; }}
@@ -434,7 +437,6 @@ def render_html(payload: dict[str, Any]) -> str:
     .toggle-btn:hover {{ background: #e8eaed; }}
     .clear-all-btn {{ padding: 0.3rem 0.7rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; }}
     .clear-all-btn:hover {{ background: #fee8e8; border-color: #f5a5a5; }}
-    .filter-footer {{ display: flex; justify-content: flex-end; margin-top: 0.5rem; }}
     .table-toolbar {{ display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; flex-wrap: wrap; }}
     .gear-btn {{ padding: 0.4rem 0.6rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 1rem; line-height: 1; }}
     .gear-btn:hover {{ background: #e8eaed; }}
@@ -469,25 +471,13 @@ def render_html(payload: dict[str, Any]) -> str:
   <h1>Rethunk Bakeoff Results</h1>
   <p>Generated at {generated_at}. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
-  <div class="filter-bar">
+  <div class="filter-bar" id="filter-bar-root">
     <div class="filter-bar-header">
-      <div class="filter-bar-header-left">
-        <label><strong>Filter results</strong></label>
-        <button class="filter-chevron" id="filter-toggle" aria-label="Toggle filter bar" title="Toggle filters">▼</button>
-      </div>
-      <div style="position:relative">
-        <button class="gear-btn" id="col-vis-btn" title="Column visibility &amp; display options">&#9881;</button>
-        <div class="col-vis-panel" id="col-vis-panel">
-          <h4>Column visibility</h4>
-          <div id="col-vis-list"></div>
-          <hr>
-          <label style="margin-top:0.25rem">
-            <input type="checkbox" id="toggle-hw-check"> Show Hardware column
-          </label>
-        </div>
-      </div>
+      <button class="filter-chevron" id="filter-toggle" aria-label="Toggle filter bar">▼</button>
+      <button class="filter-bar-title" id="filter-bar-title">Filter results</button>
+      <div id="filter-chip-strip" class="filter-chip-strip"></div>
+      <button class="clear-all-btn" id="clear-all-filters" style="display:none">Clear All</button>
     </div>
-    <div id="filter-chip-strip" class="filter-chip-strip"></div>
     <div id="filter-rows-wrap" class="filter-rows-wrap">
       <div class="filter-row">
         <div class="filter-group" data-filter-id="f-family">
@@ -561,12 +551,20 @@ def render_html(payload: dict[str, Any]) -> str:
           </div>
         </div>
       </div>
-      <div class="filter-footer">
-        <button class="clear-all-btn" id="clear-all-filters">Clear All</button>
-      </div>
     </div>
   </div>
   <div class="table-toolbar">
+    <div style="position:relative">
+      <button class="gear-btn" id="col-vis-btn" title="Column visibility &amp; display options">&#9881;</button>
+      <div class="col-vis-panel" id="col-vis-panel">
+        <h4>Column visibility</h4>
+        <div id="col-vis-list"></div>
+        <hr>
+        <label style="margin-top:0.25rem">
+          <input type="checkbox" id="toggle-hw-check"> Show Hardware column
+        </label>
+      </div>
+    </div>
   </div>
   <label for="f-text">Quick search</label>
   <input id="f-text" type="search" placeholder="Filter by run, signer, model, judge mode, config hash, or hardware">
@@ -1183,6 +1181,9 @@ def render_html(payload: dict[str, Any]) -> str:
     const filterRowsWrap = document.getElementById("filter-rows-wrap");
     const filterChipStrip = document.getElementById("filter-chip-strip");
     const filterToggleBtn = document.getElementById("filter-toggle");
+    const filterBarRoot = document.getElementById("filter-bar-root");
+    const filterBarTitle = document.getElementById("filter-bar-title");
+    const clearAllBtn = document.getElementById("clear-all-filters");
 
     const FILTER_LABELS = {{
       "f-family": "Model Family",
@@ -1193,7 +1194,7 @@ def render_html(payload: dict[str, Any]) -> str:
 
     function renderChips() {{
       filterChipStrip.innerHTML = "";
-      const expanded = filterRowsWrap.style.display !== "none";
+      const expanded = filterBarRoot && filterBarRoot.classList.contains("fb-expanded");
       if (expanded) return;
       FILTER_IDS.forEach(id => {{
         const activeVals = getActiveValues(id);
@@ -1230,17 +1231,25 @@ def render_html(payload: dict[str, Any]) -> str:
     }}
 
     function setFilterBarExpanded(expanded) {{
-      filterRowsWrap.style.display = expanded ? "" : "none";
+      if (expanded) {{
+        filterBarRoot.classList.add("fb-expanded");
+        clearAllBtn.style.display = "";
+      }} else {{
+        filterBarRoot.classList.remove("fb-expanded");
+        clearAllBtn.style.display = "none";
+      }}
       filterToggleBtn.textContent = expanded ? "▲" : "▼";
       filterToggleBtn.title = expanded ? "Collapse filters" : "Expand filters";
       try {{ localStorage.setItem("filter_bar_expanded", expanded ? "true" : "false"); }} catch(e) {{}}
       renderChips();
     }}
 
-    filterToggleBtn.addEventListener("click", () => {{
-      const expanded = filterRowsWrap.style.display !== "none";
-      setFilterBarExpanded(!expanded);
-    }});
+    function isExpanded() {{
+      return filterBarRoot && filterBarRoot.classList.contains("fb-expanded");
+    }}
+
+    filterToggleBtn.addEventListener("click", () => setFilterBarExpanded(!isExpanded()));
+    if (filterBarTitle) filterBarTitle.addEventListener("click", () => setFilterBarExpanded(!isExpanded()));
 
     let initExpanded = false;
     try {{
