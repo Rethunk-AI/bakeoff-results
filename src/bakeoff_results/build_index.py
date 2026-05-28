@@ -399,8 +399,8 @@ def render_html(payload: dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rethunk Bakeoff Results</title>
   <style>
-    body {{ font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5; }}
-    input, select {{ margin: 0.5rem 0; max-width: 32rem; padding: 0.5rem; width: 100%; }}
+    body {{ font-family: system-ui, sans-serif; margin: 0 0.8rem; line-height: 1.5; }}
+    input, select {{ margin: 0.5rem 0; max-width: 32rem; padding: 0.4rem; width: 100%; }}
     table {{ border-collapse: collapse; width: 100%; }}
     th, td {{ border-bottom: 1px solid #ddd; padding: 0.5rem; text-align: left; }}
     th {{ background: #f6f8fa; }}
@@ -408,19 +408,19 @@ def render_html(payload: dict[str, Any]) -> str:
     th.sortable:hover {{ background: #e8eaed; }}
     th.sort-asc::after {{ content: " ▲"; font-size: 0.8em; color: #0969da; }}
     th.sort-desc::after {{ content: " ▼"; font-size: 0.8em; color: #0969da; }}
-    .filter-bar {{ margin: 1rem 0; padding: 1rem; background: #f9f9f9; border-radius: 4px; }}
+    .filter-bar {{ margin: 1rem 0 0 0; padding: .4rem .8rem; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee; }}
     .filter-bar-header {{ display: flex; justify-content: space-between; align-items: center; }}
     .filter-bar-header-left {{ display: flex; align-items: center; gap: 0.5rem; }}
     .filter-chevron {{ background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.1rem 0.4rem; border-radius: 3px; color: #444; line-height: 1; }}
     .filter-chevron:hover {{ background: #e8eaed; }}
-    .filter-rows-wrap {{ margin-top: 0.75rem; }}
+    .filter-rows-wrap {{ margin-top: 0.4rem; }}
     .filter-chip-strip {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }}
     .filter-chip {{ display: inline-flex; align-items: center; gap: 0.3rem; background: #ddf4ff; color: #0969da; border: 1px solid #b6daff; border-radius: 12px; padding: 2px 10px; font-size: 0.8em; }}
     .filter-chip-clear {{ background: none; border: none; cursor: pointer; color: #0969da; font-size: 1em; padding: 0; line-height: 1; margin-left: 2px; }}
     .filter-chip-clear:hover {{ color: #cf222e; }}
     .filter-row {{ display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }}
-    .filter-group {{ flex: 1; min-width: 150px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.4rem 0.6rem; }}
-    .filter-group label {{ display: block; font-size: 0.85em; margin-bottom: 0.25rem; }}
+    .filter-group {{ flex: 1; min-width: 150px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.3rem 0.5rem; }}
+    .filter-group label {{ display: block; font-size: 0.85em; margin-bottom: 0.1rem; }}
     .filter-group-controls {{ display: flex; align-items: center; gap: 0.25rem; }}
     .filter-group-controls select {{ flex: 1; margin: 0; }}
     .filter-add-btn {{ flex-shrink: 0; padding: 0.3rem 0.5rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; line-height: 1; }}
@@ -435,7 +435,7 @@ def render_html(payload: dict[str, Any]) -> str:
     .clear-all-btn {{ padding: 0.3rem 0.7rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; }}
     .clear-all-btn:hover {{ background: #fee8e8; border-color: #f5a5a5; }}
     .filter-footer {{ display: flex; justify-content: flex-end; margin-top: 0.5rem; }}
-    .table-toolbar {{ display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; flex-wrap: wrap; }}
+    .table-toolbar {{ display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; flex-wrap: wrap; }}
     .gear-btn {{ padding: 0.4rem 0.6rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 1rem; line-height: 1; }}
     .gear-btn:hover {{ background: #e8eaed; }}
     .col-vis-panel {{ position: absolute; right: 0; z-index: 100; background: #fff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 0.75rem 1rem; min-width: 220px; display: none; }}
@@ -445,14 +445,14 @@ def render_html(payload: dict[str, Any]) -> str:
     .col-vis-panel input[type=checkbox] {{ width: auto; margin: 0; padding: 0; }}
     .col-vis-panel hr {{ margin: 0.4rem 0; border: none; border-top: 1px solid #eee; }}
     /* Range slider styles */
-    .slider-group {{ flex: 1; min-width: 180px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.4rem 0.6rem; }}
+    .slider-group {{ flex: 1; min-width: 180px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.4rem 0.5rem; }}
     .slider-group label {{ font-size: 0.85em; }}
-    .slider-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }}
+    .slider-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.1rem; }}
     .slider-range-lbl {{ font-size: 0.8em; color: #555; white-space: nowrap; }}
     .dual-slider {{ position: relative; height: 24px; }}
     .dual-track {{ position: absolute; top: 10px; height: 4px; width: 100%; border-radius: 2px; pointer-events: none; background: #ddd; }}
     .dual-thumb {{ position: absolute; width: 100%; height: 4px; top: 10px; background: transparent; pointer-events: none; -webkit-appearance: none; appearance: none; outline: none; margin: 0; padding: 0; }}
-    .dual-thumb::-webkit-slider-thumb {{ pointer-events: all; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); margin-top: -4px; }}
+    .dual-thumb::-webkit-slider-thumb {{ pointer-events: all; -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transform: translateY(-50%); }}
     .dual-thumb::-moz-range-thumb {{ pointer-events: all; width: 12px; height: 12px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; }}
     .dual-thumb:focus::-webkit-slider-thumb {{ box-shadow: 0 0 0 3px rgba(66,133,244,.3); }}
     .actions-cell {{ position: relative; padding: 0.2rem 0.3rem; text-align: center; white-space: nowrap; }}
