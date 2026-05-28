@@ -415,6 +415,7 @@ def render_html(payload: dict[str, Any]) -> str:
     .filter-bar-title {{ background: none; border: none; cursor: pointer; font-weight: bold; font-size: 1em; padding: 0; color: inherit; white-space: nowrap; flex-shrink: 0; }}
     .filter-bar-title:hover {{ text-decoration: underline; }}
     .filter-bar.fb-expanded .clear-all-btn {{ display: inline-block !important; }}
+    .filter-bar.fb-expanded #filter-chip-strip {{ display: none; }}
     .filter-bar:not(.fb-expanded) .filter-rows-wrap {{ display: none; }}
     .filter-rows-wrap {{ margin-top: 0.4rem; }}
     .filter-chip-strip {{ display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; min-width: 0; }}
@@ -1194,8 +1195,7 @@ def render_html(payload: dict[str, Any]) -> str:
 
     function renderChips() {{
       filterChipStrip.innerHTML = "";
-      const expanded = filterBarRoot && filterBarRoot.classList.contains("fb-expanded");
-      if (expanded) return;
+      // Always update; CSS hides #filter-chip-strip when .fb-expanded
       FILTER_IDS.forEach(id => {{
         const activeVals = getActiveValues(id);
         if (activeVals.length === 0) return;
@@ -1228,6 +1228,61 @@ def render_html(payload: dict[str, Any]) -> str:
         chip.appendChild(clearBtn);
         filterChipStrip.appendChild(chip);
       }});
+
+      function makeRangeChip(label, rangeText, clearFn) {{
+        const chip = document.createElement("span");
+        chip.className = "filter-chip";
+        const lbl = document.createElement("span");
+        lbl.textContent = label + ": ";
+        const val = document.createElement("strong");
+        val.textContent = rangeText;
+        chip.appendChild(lbl);
+        chip.appendChild(val);
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "filter-chip-clear";
+        clearBtn.textContent = "×";
+        clearBtn.title = "Clear " + label;
+        clearBtn.addEventListener("click", clearFn);
+        chip.appendChild(clearBtn);
+        return chip;
+      }}
+
+      if (sliderState.paramsMin !== 0 || sliderState.paramsMax !== PARAMS_SNAPS.length - 1) {{
+        filterChipStrip.appendChild(makeRangeChip(
+          "Total Params (B)",
+          PARAMS_LABELS[sliderState.paramsMin] + " – " + PARAMS_LABELS[sliderState.paramsMax],
+          () => {{
+            document.getElementById("params-min").value = 0;
+            document.getElementById("params-max").value = PARAMS_SNAPS.length - 1;
+            sliderState.paramsMin = 0; sliderState.paramsMax = PARAMS_SNAPS.length - 1;
+            updateSliderLabels(); saveSliderState(); applyFilters(); renderChips();
+          }}
+        ));
+      }}
+      if (sliderState.ctxMin !== 0 || sliderState.ctxMax !== CTX_SNAPS.length - 1) {{
+        filterChipStrip.appendChild(makeRangeChip(
+          "Context Length",
+          CTX_LABELS[sliderState.ctxMin] + " – " + CTX_LABELS[sliderState.ctxMax],
+          () => {{
+            document.getElementById("ctx-min").value = 0;
+            document.getElementById("ctx-max").value = CTX_SNAPS.length - 1;
+            sliderState.ctxMin = 0; sliderState.ctxMax = CTX_SNAPS.length - 1;
+            updateSliderLabels(); saveSliderState(); applyFilters(); renderChips();
+          }}
+        ));
+      }}
+      if (sliderState.vramMin !== 0 || sliderState.vramMax !== VRAM_SNAPS.length - 1) {{
+        filterChipStrip.appendChild(makeRangeChip(
+          "VRAM (GB)",
+          VRAM_LABELS[sliderState.vramMin] + " – " + VRAM_LABELS[sliderState.vramMax],
+          () => {{
+            document.getElementById("vram-min").value = 0;
+            document.getElementById("vram-max").value = VRAM_SNAPS.length - 1;
+            sliderState.vramMin = 0; sliderState.vramMax = VRAM_SNAPS.length - 1;
+            updateSliderLabels(); saveSliderState(); applyFilters(); renderChips();
+          }}
+        ));
+      }}
     }}
 
     function setFilterBarExpanded(expanded) {{
