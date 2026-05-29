@@ -57,6 +57,51 @@ jobs:
       - name: Validate submissions
         run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Advisory Sigstore bundle check (non-blocking)
+        continue-on-error: true
+        run: |
+          echo "============================================================"
+          echo "ADVISORY: cosign verify-blob check — NOT gating this job."
+          echo "Existing submissions carry stub signature.sigstore.json files"
+          echo "that are not real Sigstore bundles. Full enforcement is"
+          echo "deferred until the upstream submitting workflow stabilises."
+          echo "TODO: promote to a hard gate — see issue #23."
+          echo "============================================================"
+
+          found=0
+          while IFS= read -r bundle; do
+            found=$((found + 1))
+            signed_file="$(dirname "$bundle")/manifest.json"
+            echo ""
+            echo "Bundle: $bundle"
+            if [ ! -f "$signed_file" ]; then
+              echo "  SKIP: expected signed file not found at $signed_file"
+              continue
+            fi
+            echo "  Signed file: $signed_file"
+            echo "  Attempting cosign verify-blob (advisory, failures expected on stubs)..."
+            cosign verify-blob \
+              --bundle "$bundle" \
+              --certificate-identity-regexp ".*" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "$signed_file" 2>&1 \
+              && echo "  RESULT: PASS" \
+              || echo "  RESULT: FAIL (advisory — not blocking; stub bundle or missing real signature)"
+          done < <(find submissions -name "signature.sigstore.json")
+
+          if [ "$found" -eq 0 ]; then
+            echo "No signature.sigstore.json files found in submissions/ — nothing to verify."
+          else
+            echo ""
+            echo "Advisory check complete. $found bundle(s) examined. See above for per-bundle results."
+          fi
+          echo "============================================================"
+          echo "ADVISORY step done. Job continues regardless of outcome."
+          echo "============================================================"
+
       - name: Build static index
         run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
 
