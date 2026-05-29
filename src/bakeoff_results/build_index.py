@@ -524,17 +524,17 @@ def render_html(payload: dict[str, Any]) -> str:
     th.sort-desc::after {{ content: " ▼"; font-size: 0.8em; color: #0969da; }}
     .filter-bar {{ margin: 1rem 0 0 0; padding: .4rem .8rem; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee; }}
     .filter-bar-header {{ display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }}
-    .filter-chevron {{ background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 0.1rem 0.3rem; border-radius: 3px; color: #444; line-height: 1; flex-shrink: 0; transition: transform 0.15s ease-in-out; }}
+    .filter-chevron {{ background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 0.1rem 0.3rem; border-radius: 3px; color: #444; line-height: 1; flex-shrink: 0; transition: transform 0.3s ease-in-out; }}
     .filter-bar.fb-expanded .filter-chevron {{ transform: rotate(180deg); }}
     .filter-chevron:hover {{ background: #e8eaed; }}
     .filter-bar-title {{ background: none; border: none; cursor: pointer; font-weight: bold; font-size: 1em; padding: 0; color: inherit; white-space: nowrap; flex-shrink: 0; }}
     .filter-bar-title:hover {{ text-decoration: underline; }}
     .clear-all-btn {{ opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }}
     .filter-bar.fb-expanded .clear-all-btn {{ opacity: 1; pointer-events: auto; }}
-    #filter-rows-wrap {{ overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.5s ease, opacity 0.25s ease; }}
+    #filter-rows-wrap {{ overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.5s ease, opacity 0.5s ease; }}
     .filter-bar.fb-expanded #filter-rows-wrap {{ max-height: 900px; opacity: 1; transition: max-height 0.5s ease, opacity 0.25s ease; }}
     .fb-no-anim, .fb-no-anim * {{ transition: none !important; }}
-    #filter-chip-strip {{ opacity: 1; transition: opacity 0.25s ease; }}
+    #filter-chip-strip {{ opacity: 1; transition: opacity 0.25s ease 0.25s; }}
     .filter-bar.fb-expanded #filter-chip-strip {{ opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }}
     .filter-bar.fb-expanded .filter-rows-wrap {{ margin-top: 0.4rem; }}
     .filter-chip-strip {{ display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; min-width: 0; }}
