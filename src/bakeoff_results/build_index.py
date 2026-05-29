@@ -154,9 +154,72 @@ def _hardware(result: dict[str, Any]) -> dict[str, Any] | str:
     return "unknown"
 
 
+# Result states recognized for badge rendering. The first three are the
+# governance-defined states (GOVERNANCE.md); `incomplete`/`failed` extend them
+# so non-finishing runs are first-class rather than invisible (refs #9, #21).
+VALID_STATES = ("superseded", "disputed", "revoked", "incomplete", "failed")
+
+
+def _state(result: dict[str, Any], manifest: dict[str, Any]) -> str | None:
+    """Result state for badge rendering. Read from result or manifest.
+
+    Returns a recognized lowercase state, or None when absent/unrecognized so
+    accepted runs render no badge (graceful degradation — most bundles today
+    carry no state field yet)."""
+    for source in (result, manifest):
+        value = source.get("state")
+        if isinstance(value, str) and value.strip().lower() in VALID_STATES:
+            return value.strip().lower()
+    return None
+
+
+def _outcome(result: dict[str, Any]) -> str | None:
+    """Run outcome (e.g. completed/incomplete/failed) when the harness emits it."""
+    value = result.get("outcome")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _failure_reason(result: dict[str, Any]) -> str | None:
+    """Why/how a run did not complete, when present. Display side of #9 — the
+    harness must emit this upstream (Rethunk-AI/bakeoff) before it is populated."""
+    for key in ("failure_reason", "failure", "error"):
+        value = result.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _score(result: dict[str, Any]) -> str | None:
+    """Relative/partial score so weak or non-finishing runs still rank (#9).
+
+    Accepts `score` or `partial_score` as number or string; normalized to a
+    short display string. None when absent."""
+    for key in ("score", "partial_score"):
+        value = result.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            return f"{value:g}"
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _cohort(entry: dict[str, Any]) -> str:
+    """Comparability signature: only runs sharing judge mode + config hash are
+    directly rank-comparable (#22). Empty when neither is known."""
+    parts = [
+        str(entry.get("judge_mode") or "").strip(),
+        str(entry.get("config_hash") or "").strip(),
+    ]
+    return "|".join(p for p in parts if p)
+
+
 def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
     result = bundle.result
-    return {
+    entry = {
         "run_id": result["run_id"],
         "timestamp": result["timestamp"],
         "signer": _signer(bundle.manifest),
@@ -175,8 +238,14 @@ def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
         or _nested_string(result, "config", "hash")
         or _nested_string(result, "config", "sha256"),
         "hardware": _hardware(result),
+        "state": _state(result, bundle.manifest),
+        "outcome": _outcome(result),
+        "failure_reason": _failure_reason(result),
+        "score": _score(result),
         "bundle_path": bundle.path.as_posix(),
     }
+    entry["cohort"] = _cohort(entry)
+    return entry
 
 
 def build_index(submissions_dir: Path | str, site_dir: Path | str) -> dict[str, Any]:
@@ -336,12 +405,30 @@ def render_html(payload: dict[str, Any]) -> str:
         hw = entry.get("hardware") or "unknown"
         hw_tier_val, hw_vram_mb = _hw_tier(hw)
 
+        state = entry.get("state") or ""
+        score = entry.get("score") or ""
+        failure_reason = entry.get("failure_reason") or ""
+        cohort = entry.get("cohort") or ""
+
         # Columns (no config_hash in main columns — moved to row detail)
         # Col indices: 0=Run ID, 1=Timestamp, 2=Signer, 3=Models, 4=Judge Mode,
         #              5=Model Family, 6=Architecture, 7=Params(total), 8=Params(active),
         #              9=Context Len, 10=Quantization, 11=Similar Results (hidden), 12=Hardware
+        # Run ID cell (col 0) carries inline state + score badges so non-finishing
+        # and graded runs are visible WITHOUT adding table columns (refs #9, #21).
+        badges = ""
+        if state:
+            badges += (
+                f'<span class="state-badge state-{html.escape(state, quote=True)}" '
+                f'title="Result state: {html.escape(state, quote=True)}">{html.escape(state)}</span>'
+            )
+        if score:
+            badges += (
+                f'<span class="score-badge" title="Relative score">'
+                f'{html.escape(str(score))}</span>'
+            )
+        run_id_cell = f"<td>{badges}{html.escape(str(entry.get('run_id') or ''))}</td>"
         plain_cells = [
-            entry.get("run_id"),
             entry.get("timestamp"),
             entry.get("signer") or "",
             model_ids,
@@ -353,20 +440,31 @@ def render_html(payload: dict[str, Any]) -> str:
             entry.get("context_length") or "unknown",
             entry.get("quantization") or "unknown",
         ]
-        cells_html = "".join(f"<td>{html.escape(str(cell))}</td>" for cell in plain_cells)
+        cells_html = run_id_cell + "".join(
+            f"<td>{html.escape(str(cell))}</td>" for cell in plain_cells
+        )
         # Similar Results column (hidden by default — JS will populate badge content)
         cells_html += '<td class="similar-results-col" style="display:none"></td>'
         cells_html += f"<td class='hw-col-td' style='display:none'>{_hw_cell_html(hw)}</td>"
 
-        # Config hash in per-row Actions menu (⋮ button)
+        # Per-row Actions menu (⋮): config hash copy + failure reason when present
         cfg_escaped = html.escape(config_hash, quote=True)
+        menu_items = ""
         if config_hash:
+            menu_items += (
+                f'<button class="actions-menu-item" data-copy="{cfg_escaped}">'
+                f'Copy config hash</button>'
+            )
+        if failure_reason:
+            menu_items += (
+                f'<div class="actions-menu-info" title="{html.escape(failure_reason, quote=True)}">'
+                f'Failure: {html.escape(failure_reason)}</div>'
+            )
+        if menu_items:
             actions_cell = (
                 f'<td class="actions-cell">'
                 f'<button class="actions-btn" title="Row actions">&#8942;</button>'
-                f'<div class="actions-menu">'
-                f'<button class="actions-menu-item" data-copy="{cfg_escaped}">Copy config hash</button>'
-                f'</div>'
+                f'<div class="actions-menu">{menu_items}</div>'
                 f'</td>'
             )
         else:
@@ -383,6 +481,9 @@ def render_html(payload: dict[str, Any]) -> str:
             "hw_vram_mb": str(hw_vram_mb),
             "hw_arch": _gpu_arch_family(hw),
             "config_hash": config_hash,
+            "state": state,
+            "score": score,
+            "cohort": cohort,
         }
         str_data = {k: str(v) for k, v in data.items()}
         attrs = " ".join(f'data-{k}="{html.escape(v, quote=True)}"' for k, v in str_data.items())
@@ -438,6 +539,14 @@ def render_html(payload: dict[str, Any]) -> str:
     .multi-panel label {{ display: flex; align-items: center; gap: 0.4rem; font-size: 0.85em; margin-bottom: 0.2rem; cursor: pointer; font-weight: normal; }}
     .multi-panel input[type=checkbox] {{ width: auto; margin: 0; padding: 0; }}
     .similar-badge {{ display: inline-block; font-size: 0.8em; color: #58a6ff; background: #ddf4ff; padding: 1px 6px; border-radius: 3px; }}
+    .state-badge {{ display: inline-block; font-size: 0.72em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; padding: 1px 6px; border-radius: 3px; margin-right: 0.4rem; vertical-align: middle; border: 1px solid transparent; }}
+    .state-superseded {{ color: #57606a; background: #eaeef2; border-color: #d0d7de; }}
+    .state-disputed {{ color: #9a6700; background: #fff8c5; border-color: #eac54f; }}
+    .state-revoked {{ color: #cf222e; background: #ffebe9; border-color: #ff818266; }}
+    .state-incomplete {{ color: #9a6700; background: #fff4e0; border-color: #f0c674; }}
+    .state-failed {{ color: #cf222e; background: #ffebe9; border-color: #ff818266; }}
+    .score-badge {{ display: inline-block; font-size: 0.72em; font-weight: 600; color: #1a7f37; background: #dafbe1; border: 1px solid #aceebb; padding: 1px 6px; border-radius: 3px; margin-right: 0.4rem; vertical-align: middle; }}
+    .actions-menu-info {{ padding: 0.4rem 0.75rem; font-size: 0.8em; color: #57606a; max-width: 320px; white-space: normal; border-top: 1px solid #eee; }}
     .toggle-btn {{ padding: 0.4rem 0.8rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; }}
     .toggle-btn:hover {{ background: #e8eaed; }}
     .clear-all-btn {{ padding: 0.3rem 0.7rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; }}
@@ -516,6 +625,22 @@ def render_html(payload: dict[str, Any]) -> str:
             <button class="filter-add-btn" data-target="f-gpu" title="Add value (multi-select)">+</button>
           </div>
           <div class="multi-panel" id="mp-f-gpu"></div>
+        </div>
+        <div class="filter-group" data-filter-id="f-state">
+          <label for="f-state">Result State</label>
+          <div class="filter-group-controls">
+            <select id="f-state"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-state" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-state"></div>
+        </div>
+        <div class="filter-group" data-filter-id="f-cohort">
+          <label for="f-cohort" title="Only runs sharing judge mode + config hash are directly rank-comparable">Cohort</label>
+          <div class="filter-group-controls">
+            <select id="f-cohort"><option value="">All</option></select>
+            <button class="filter-add-btn" data-target="f-cohort" title="Add value (multi-select)">+</button>
+          </div>
+          <div class="multi-panel" id="mp-f-cohort"></div>
         </div>
       </div>
       <div class="filter-row">
@@ -719,7 +844,7 @@ def render_html(payload: dict[str, Any]) -> str:
     }}
 
     // --- Multi-select filter state ---
-    const FILTER_IDS = ["f-family", "f-arch", "f-quant", "f-gpu"];
+    const FILTER_IDS = ["f-family", "f-arch", "f-quant", "f-gpu", "f-state", "f-cohort"];
     let filterMode = {{}};
     let filterValues = {{}};
     try {{
@@ -849,6 +974,8 @@ def render_html(payload: dict[str, Any]) -> str:
     populateSelect("f-family", "model_family");
     populateSelect("f-arch", "architecture");
     populateSelect("f-quant", "quantization");
+    populateSelect("f-state", "state");
+    populateSelect("f-cohort", "cohort");
 
     function populateComputed(id, computeFn) {{
       const sel = document.getElementById(id);
@@ -882,6 +1009,8 @@ def render_html(payload: dict[str, Any]) -> str:
       if (id === "f-arch") return (row.dataset.architecture || "").toLowerCase();
       if (id === "f-quant") return (row.dataset.quantization || "").toLowerCase();
       if (id === "f-gpu") return (row.dataset.hw_arch || "").toLowerCase();
+      if (id === "f-state") return (row.dataset.state || "").toLowerCase();
+      if (id === "f-cohort") return (row.dataset.cohort || "").toLowerCase();
       return "";
     }}
 
@@ -1194,7 +1323,9 @@ def render_html(payload: dict[str, Any]) -> str:
       "f-family": "Model Family",
       "f-arch": "Architecture",
       "f-quant": "Quantization",
-      "f-gpu": "GPU Architecture"
+      "f-gpu": "GPU Architecture",
+      "f-state": "Result State",
+      "f-cohort": "Cohort"
     }};
 
     function renderChips() {{
