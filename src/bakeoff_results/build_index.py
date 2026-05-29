@@ -568,7 +568,7 @@ def render_html(payload: dict[str, Any]) -> str:
     .table-toolbar {{ display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; flex-wrap: wrap; }}
     .gear-btn {{ padding: 0.4rem 0.6rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 1rem; line-height: 1; }}
     .gear-btn:hover {{ background: #e8eaed; }}
-    .col-vis-panel {{ position: absolute; left: 0; right: auto; z-index: 100; background: #fff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 0.75rem 1rem; min-width: 220px; display: none; }}
+    .col-vis-panel {{ position: absolute; left: 0; z-index: 100; background: #fff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 0.75rem 1rem; min-width: 220px; display: none; }}
     .col-vis-panel.active {{ display: block; }}
     .col-vis-panel h4 {{ margin: 0 0 0.5rem 0; font-size: 0.9em; color: #555; }}
     .col-vis-panel label {{ display: flex; align-items: center; gap: 0.4rem; font-size: 0.85em; margin-bottom: 0.25rem; cursor: pointer; font-weight: normal; }}
