@@ -26,6 +26,19 @@ Every published run should be treated as one of these states:
 - `revoked`: the bundle failed policy, integrity, provenance, or moderation
   review after publication.
 
+Two further states describe run *outcome* rather than moderation lifecycle, so
+that runs which did not finish are recorded rather than hidden:
+
+- `incomplete`: the run did not finish the full suite (timeout, cancellation,
+  partial execution). A partial/relative score may still be reported.
+- `failed`: the run could not produce usable results (load failure, crash,
+  capability floor not met). The failure reason should accompany it.
+
+The leaderboard renders any non-`accepted` state as an inline badge on the run,
+and `incomplete`/`failed` runs may carry a partial score and a failure reason.
+The underlying outcome data is emitted upstream by the bakeoff harness; see the
+downstream contract in `Rethunk-AI/bakeoff#23`.
+
 State changes must be evidence-backed and recorded with the affected run ID,
 reason, reviewer, timestamp, and links to supporting material.
 
