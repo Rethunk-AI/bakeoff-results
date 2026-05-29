@@ -236,7 +236,7 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertIn("score-badge", html)
             self.assertIn("timeout after 600s", html)
             self.assertIn('id="f-state"', html)
-            self.assertIn('id="f-cohort"', html)
+            self.assertNotIn('id="f-cohort"', html)
             # Column count unchanged — no Column Count Mismatch (cf. closed #20)
             self.assertEqual(html.count('data-col-index="'), 13)
 

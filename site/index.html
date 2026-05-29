@@ -23,8 +23,8 @@
     .filter-bar-title:hover { text-decoration: underline; }
     .clear-all-btn { opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
     .filter-bar.fb-expanded .clear-all-btn { opacity: 1; pointer-events: auto; }
-    #filter-rows-wrap { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.5s ease-out, opacity 0.5s ease; }
-    .filter-bar.fb-expanded #filter-rows-wrap { max-height: 400px; opacity: 1; transition: max-height 0.5s ease, opacity 0.25s ease; }
+    #filter-rows-wrap { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.5s ease-out, opacity 0.4s ease-in 0.1s; }
+    .filter-bar.fb-expanded #filter-rows-wrap { max-height: 260px; opacity: 1; transition: max-height 0.5s ease, opacity 0.25s ease; }
     .fb-no-anim, .fb-no-anim * { transition: none !important; }
     #filter-chip-strip { opacity: 1; transition: opacity 0.25s ease 0.25s; }
     .filter-bar.fb-expanded #filter-chip-strip { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
@@ -74,7 +74,8 @@
     .dual-slider { position: relative; height: 24px; }
     .dual-track { position: absolute; top: 10px; height: 4px; width: 100%; border-radius: 2px; pointer-events: none; background: #ddd; }
     .dual-thumb { position: absolute; width: 100%; height: 4px; top: 10px; background: transparent; pointer-events: none; -webkit-appearance: none; appearance: none; outline: none; margin: 0; padding: 0; }
-    .dual-thumb::-webkit-slider-thumb { pointer-events: all; -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); margin-top: -6px; }
+    .dual-thumb::-webkit-slider-runnable-track { height: 4px; }
+    .dual-thumb::-webkit-slider-thumb { pointer-events: all; -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); margin-top: 0; }
     .dual-thumb::-moz-range-thumb { pointer-events: all; width: 12px; height: 12px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; }
     .dual-thumb:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(66,133,244,.3); }
     .actions-cell { position: relative; padding: 0.2rem 0.3rem; text-align: center; white-space: nowrap; }
@@ -89,7 +90,7 @@
 </head>
 <body>
   <h1>Rethunk Bakeoff Results</h1>
-  <p>Generated at 2026-05-29T11:21:42+00:00 — commit <code>e17a45c</code>. This static index is backed by validated
+  <p>Generated at 2026-05-29T11:49:35+00:00 — commit <code>5496d71</code>. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar" id="filter-bar-root">
     <div class="filter-bar-header">
@@ -139,14 +140,6 @@
             <button class="filter-add-btn" data-target="f-state" title="Add value (multi-select)">+</button>
           </div>
           <div class="multi-panel" id="mp-f-state"></div>
-        </div>
-        <div class="filter-group" data-filter-id="f-cohort">
-          <label for="f-cohort" title="Only runs sharing judge mode + config hash are directly rank-comparable">Cohort</label>
-          <div class="filter-group-controls">
-            <select id="f-cohort"><option value="">All</option></select>
-            <button class="filter-add-btn" data-target="f-cohort" title="Add value (multi-select)">+</button>
-          </div>
-          <div class="multi-panel" id="mp-f-cohort"></div>
         </div>
       </div>
       <div class="filter-row">
@@ -354,7 +347,7 @@
     }
 
     // --- Multi-select filter state ---
-    const FILTER_IDS = ["f-family", "f-arch", "f-quant", "f-gpu", "f-state", "f-cohort"];
+    const FILTER_IDS = ["f-family", "f-arch", "f-quant", "f-gpu", "f-state"];
     let filterMode = {};
     let filterValues = {};
     try {
@@ -485,7 +478,6 @@
     populateSelect("f-arch", "architecture");
     populateSelect("f-quant", "quantization");
     populateSelect("f-state", "state");
-    populateSelect("f-cohort", "cohort");
 
     function populateComputed(id, computeFn) {
       const sel = document.getElementById(id);
@@ -520,7 +512,6 @@
       if (id === "f-quant") return (row.dataset.quantization || "").toLowerCase();
       if (id === "f-gpu") return (row.dataset.hw_arch || "").toLowerCase();
       if (id === "f-state") return (row.dataset.state || "").toLowerCase();
-      if (id === "f-cohort") return (row.dataset.cohort || "").toLowerCase();
       return "";
     }
 
@@ -834,8 +825,7 @@
       "f-arch": "Architecture",
       "f-quant": "Quantization",
       "f-gpu": "GPU Architecture",
-      "f-state": "Result State",
-      "f-cohort": "Cohort"
+      "f-state": "Result State"
     };
 
     function renderChips() {

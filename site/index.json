@@ -82,7 +82,7 @@
       "timestamp": "2026-05-19T10:00:00Z"
     }
   ],
-  "generated_at": "2026-05-29T11:21:42+00:00",
-  "git_hash": "e17a45c",
+  "generated_at": "2026-05-29T11:49:35+00:00",
+  "git_hash": "5496d71",
   "schema_version": "bakeoff-results/v1"
 }
