@@ -6,6 +6,7 @@ import argparse
 import html
 import json
 import re
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -258,9 +259,20 @@ def build_index(submissions_dir: Path | str, site_dir: Path | str) -> dict[str, 
         reverse=True,
     )
 
+    try:
+        git_hash = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(submissions_dir),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        git_hash = ""
+
     payload = {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "git_hash": git_hash,
         "entries": entries,
     }
 
@@ -490,6 +502,7 @@ def render_html(payload: dict[str, Any]) -> str:
         rows.append(f"<tr class='data-row' {attrs}>{cells_html}{actions_cell}</tr>")
 
     generated_at = html.escape(str(payload["generated_at"]))
+    git_hash = html.escape(str(payload.get("git_hash", "")))
     body_rows = "\n".join(rows) if rows else (
         '<tr><td colspan="14">No submissions have been published yet.</td></tr>'
     )
@@ -516,18 +529,19 @@ def render_html(payload: dict[str, Any]) -> str:
     .filter-chevron:hover {{ background: #e8eaed; }}
     .filter-bar-title {{ background: none; border: none; cursor: pointer; font-weight: bold; font-size: 1em; padding: 0; color: inherit; white-space: nowrap; flex-shrink: 0; }}
     .filter-bar-title:hover {{ text-decoration: underline; }}
-    .filter-bar.fb-expanded .clear-all-btn {{ display: inline-block !important; }}
-    #filter-rows-wrap {{ overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.3s ease 0.3s, opacity 0.3s ease 0s; }}
-    .filter-bar.fb-expanded #filter-rows-wrap {{ max-height: 900px; opacity: 1; transition: max-height 0.3s ease 0s, opacity 0.3s ease 0.3s; }}
+    .clear-all-btn {{ opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }}
+    .filter-bar.fb-expanded .clear-all-btn {{ opacity: 1; pointer-events: auto; }}
+    #filter-rows-wrap {{ overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.5s ease, opacity 0.25s ease; }}
+    .filter-bar.fb-expanded #filter-rows-wrap {{ max-height: 900px; opacity: 1; transition: max-height 0.5s ease, opacity 0.25s ease; }}
     .fb-no-anim, .fb-no-anim * {{ transition: none !important; }}
-    #filter-chip-strip {{ opacity: 1; transition: opacity 0.3s ease 0.3s; }}
-    .filter-bar.fb-expanded #filter-chip-strip {{ opacity: 0; pointer-events: none; transition: opacity 0.3s ease 0s; }}
-    .filter-rows-wrap {{ margin-top: 0.4rem; }}
+    #filter-chip-strip {{ opacity: 1; transition: opacity 0.25s ease; }}
+    .filter-bar.fb-expanded #filter-chip-strip {{ opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }}
+    .filter-bar.fb-expanded .filter-rows-wrap {{ margin-top: 0.4rem; }}
     .filter-chip-strip {{ display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; min-width: 0; }}
     .filter-chip {{ display: inline-flex; align-items: center; gap: 0.3rem; background: #ddf4ff; color: #0969da; border: 1px solid #b6daff; border-radius: 12px; padding: 2px 10px; font-size: 0.8em; }}
     .filter-chip-clear {{ background: none; border: none; cursor: pointer; color: #0969da; font-size: 1em; padding: 0; line-height: 1; margin-left: 2px; }}
     .filter-chip-clear:hover {{ color: #cf222e; }}
-    .filter-row {{ display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }}
+    .filter-row {{ display: flex; column-gap: 1rem; row-gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }}
     .filter-group {{ flex: 1; min-width: 150px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.3rem 0.5rem; }}
     .filter-group label {{ display: block; font-size: 0.85em; margin-bottom: 0.1rem; }}
     .filter-group-controls {{ display: flex; align-items: center; gap: 0.25rem; }}
@@ -568,7 +582,7 @@ def render_html(payload: dict[str, Any]) -> str:
     .dual-slider {{ position: relative; height: 24px; }}
     .dual-track {{ position: absolute; top: 10px; height: 4px; width: 100%; border-radius: 2px; pointer-events: none; background: #ddd; }}
     .dual-thumb {{ position: absolute; width: 100%; height: 4px; top: 10px; background: transparent; pointer-events: none; -webkit-appearance: none; appearance: none; outline: none; margin: 0; padding: 0; }}
-    .dual-thumb::-webkit-slider-thumb {{ pointer-events: all; -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transform: translateY(-50%); }}
+    .dual-thumb::-webkit-slider-thumb {{ pointer-events: all; -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); margin-top: -6px; }}
     .dual-thumb::-moz-range-thumb {{ pointer-events: all; width: 12px; height: 12px; border-radius: 50%; background: #4285f4; cursor: pointer; border: 2px solid #fff; }}
     .dual-thumb:focus::-webkit-slider-thumb {{ box-shadow: 0 0 0 3px rgba(66,133,244,.3); }}
     .actions-cell {{ position: relative; padding: 0.2rem 0.3rem; text-align: center; white-space: nowrap; }}
@@ -583,14 +597,14 @@ def render_html(payload: dict[str, Any]) -> str:
 </head>
 <body>
   <h1>Rethunk Bakeoff Results</h1>
-  <p>Generated at {generated_at}. This static index is backed by validated
+  <p>Generated at {generated_at}{' — commit <code>' + git_hash + '</code>' if git_hash else ''}. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar" id="filter-bar-root">
     <div class="filter-bar-header">
       <button class="filter-chevron" id="filter-toggle" aria-label="Toggle filter bar">▼</button>
-      <button class="filter-bar-title" id="filter-bar-title">Filter results</button>
+      <button class="filter-bar-title" id="filter-bar-title">Filter results:</button>
       <div id="filter-chip-strip" class="filter-chip-strip"></div>
-      <button class="clear-all-btn" id="clear-all-filters" style="display:none">Clear All</button>
+      <button class="clear-all-btn" id="clear-all-filters">Clear All</button>
     </div>
     <div id="filter-rows-wrap" class="filter-rows-wrap">
       <div class="filter-row">
@@ -684,7 +698,7 @@ def render_html(payload: dict[str, Any]) -> str:
     </div>
   </div>
   <div class="table-toolbar">
-    <div style="position:relative">
+    <div style="position:relative;flex-shrink:0;align-self:flex-end">
       <button class="gear-btn" id="col-vis-btn" title="Column visibility &amp; display options">&#9881;</button>
       <div class="col-vis-panel" id="col-vis-panel">
         <h4>Column visibility</h4>
@@ -695,9 +709,11 @@ def render_html(payload: dict[str, Any]) -> str:
         </label>
       </div>
     </div>
+    <div style="flex:1;min-width:0">
+      <label for="f-text" style="display:block;font-size:0.85em;margin-bottom:0.1rem">Quick search</label>
+      <input id="f-text" type="search" placeholder="Filter by run, signer, model, judge mode, config hash, or hardware" style="margin:0;width:100%;max-width:none">
+    </div>
   </div>
-  <label for="f-text">Quick search</label>
-  <input id="f-text" type="search" placeholder="Filter by run, signer, model, judge mode, config hash, or hardware">
   <table>
     <thead>
       <tr>
