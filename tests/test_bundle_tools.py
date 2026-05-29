@@ -21,7 +21,12 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def make_bundle(root: Path, *, include_required_result_fields: bool = True) -> Path:
+def make_bundle(
+    root: Path,
+    *,
+    include_required_result_fields: bool = True,
+    extra_result: dict | None = None,
+) -> Path:
     bundle = root / "publisher" / "run-001"
     bundle.mkdir(parents=True)
 
@@ -37,6 +42,8 @@ def make_bundle(root: Path, *, include_required_result_fields: bool = True) -> P
             "source_commit": "abc1234",
         }
         result["models"] = [{"id": "model-a"}, {"model_id": "model-b"}]
+    if extra_result:
+        result.update(extra_result)
 
     write_json(bundle / "result.json", result)
     (bundle / "summary.md").write_text("# Summary\n\nFixture result.\n", encoding="utf-8")
@@ -200,6 +207,53 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertEqual(entry["model_ids"], ["m_a"])
             self.assertEqual(entry["judge_mode"], "pairwise_all")
             self.assertEqual(entry["config_hash"], "abc123")
+
+    def test_state_score_and_failure_render(self) -> None:
+        # A non-finishing/graded run: state, partial score, and failure reason
+        # are extracted and surfaced inline without adding table columns.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_bundle(
+                root / "submissions",
+                extra_result={
+                    "state": "Incomplete",  # case-insensitive
+                    "partial_score": 0.42,
+                    "failure_reason": "timeout after 600s",
+                },
+            )
+
+            payload = build_index(root / "submissions", root / "site")
+            entry = payload["entries"][0]
+
+            self.assertEqual(entry["state"], "incomplete")
+            self.assertEqual(entry["score"], "0.42")
+            self.assertEqual(entry["failure_reason"], "timeout after 600s")
+            # cohort = judge_mode|config_hash
+            self.assertEqual(entry["cohort"], "static-fixture|config-sha256")
+
+            html = (root / "site" / "index.html").read_text(encoding="utf-8")
+            self.assertIn("state-incomplete", html)
+            self.assertIn("score-badge", html)
+            self.assertIn("timeout after 600s", html)
+            self.assertIn('id="f-state"', html)
+            self.assertIn('id="f-cohort"', html)
+            # Column count unchanged — no Column Count Mismatch (cf. closed #20)
+            self.assertEqual(html.count('data-col-index="'), 13)
+
+    def test_no_state_renders_no_badge(self) -> None:
+        # Graceful degradation: bundles without the new fields render cleanly.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_bundle(root / "submissions")
+
+            payload = build_index(root / "submissions", root / "site")
+            entry = payload["entries"][0]
+
+            self.assertIsNone(entry["state"])
+            self.assertIsNone(entry["score"])
+            self.assertIsNone(entry["failure_reason"])
+            html = (root / "site" / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn("state-badge state-", html)
 
 
 if __name__ == "__main__":
