@@ -9,5 +9,5 @@ Future backlog only. Current work is tracked in GitHub Issues.
 
 ## Leaderboard
 
-- [ ] Cohort filtering — gate aggregate rankings by compatible config/task/judge/schema to prevent misleading cross-run comparisons
+- [ ] Remove `cohort` field — drop from schema, `build_index.py`, and `site/index.html` once all synthetic records are purged; field must never appear in real result records (see [#22](https://github.com/Rethunk-AI/bakeoff-results/issues/22))
 - [ ] Disputed/superseded/revoked state badges on index entries
