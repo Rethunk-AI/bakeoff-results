@@ -531,7 +531,7 @@ def render_html(payload: dict[str, Any]) -> str:
     .filter-bar-title:hover {{ text-decoration: underline; }}
     .clear-all-btn {{ opacity: 0; pointer-events: none; transition: opacity 0.25s linear; }}
     .filter-bar.fb-expanded .clear-all-btn {{ opacity: 1; pointer-events: auto; }}
-    #filter-rows-wrap {{ overflow: hidden; max-height: 0; opacity: 0; margin-top: 0; transition: max-height 0.35s linear, opacity 0.35s linear, margin-top 0.35s linear; }}
+    #filter-rows-wrap {{ overflow: hidden; max-height: 0; opacity: 0; margin-top: 0; transition: max-height 0.35s linear, opacity 0.2s linear 0.15s, margin-top 0.35s linear; }}
     .filter-bar.fb-expanded #filter-rows-wrap {{ max-height: 260px; opacity: 1; margin-top: 0.4rem; transition: max-height 0.35s linear, opacity 0.25s linear, margin-top 0.35s linear; }}
     .fb-no-anim, .fb-no-anim * {{ transition: none !important; }}
     #filter-chip-strip {{ opacity: 1; transition: opacity 0.2s linear 0.15s; }}
