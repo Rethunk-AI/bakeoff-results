@@ -1425,9 +1425,19 @@ def render_html(payload: dict[str, Any]) -> str:
 
     function setFilterBarExpanded(expanded) {{
       if (expanded) {{
+        filterRowsWrap.style.maxHeight = '';
         filterBarRoot.classList.add("fb-expanded");
       }} else {{
+        // Pin inline max-height to actual scroll height before removing class so the
+        // transition starts from the real content height, not the CSS max-height ceiling.
+        // This eliminates the dead zone that made collapse feel sluggish at the start.
+        const h = filterRowsWrap.scrollHeight;
+        filterRowsWrap.style.maxHeight = h + 'px';
+        filterRowsWrap.offsetHeight; // force reflow before class removal
         filterBarRoot.classList.remove("fb-expanded");
+        filterRowsWrap.addEventListener('transitionend', function(e) {{
+          if (e.propertyName === 'max-height') filterRowsWrap.style.maxHeight = '';
+        }}, {{ once: true }});
       }}
       try {{ localStorage.setItem("filter_bar_expanded", expanded ? "true" : "false"); }} catch(e) {{}}
       renderChips();
@@ -1447,7 +1457,10 @@ def render_html(payload: dict[str, Any]) -> str:
     }} catch(e) {{}}
     filterBarRoot.classList.add("fb-no-anim");
     setFilterBarExpanded(initExpanded);
-    requestAnimationFrame(() => requestAnimationFrame(() => filterBarRoot.classList.remove("fb-no-anim")));
+    requestAnimationFrame(() => requestAnimationFrame(() => {{
+      filterBarRoot.classList.remove("fb-no-anim");
+      filterRowsWrap.style.maxHeight = '';
+    }}));
 
     // --- Clear All inside filter box ---
     document.getElementById("clear-all-filters").addEventListener("click", () => {{
