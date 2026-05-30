@@ -531,8 +531,8 @@ def render_html(payload: dict[str, Any]) -> str:
     .filter-bar-title:hover {{ text-decoration: underline; }}
     .clear-all-btn {{ opacity: 0; pointer-events: none; transition: opacity 0.25s linear; }}
     .filter-bar.fb-expanded .clear-all-btn {{ opacity: 1; pointer-events: auto; }}
-    #filter-rows-wrap {{ overflow: hidden; max-height: 0; opacity: 0; margin-top: 0; transition: max-height 0.35s linear, opacity 0.2s linear 0.15s, margin-top 0.35s linear; }}
-    .filter-bar.fb-expanded #filter-rows-wrap {{ max-height: 260px; opacity: 1; margin-top: 0.4rem; transition: max-height 0.35s linear, opacity 0.25s linear, margin-top 0.35s linear; }}
+    #filter-rows-wrap {{ overflow: hidden; height: 0; padding-top: 0.4rem; opacity: 0; transition: height 0.35s linear, opacity 0.35s linear; }}
+    .filter-bar.fb-expanded #filter-rows-wrap {{ opacity: 1; transition: height 0.35s linear, opacity 0.25s linear; }}
     .fb-no-anim, .fb-no-anim * {{ transition: none !important; }}
     #filter-chip-strip {{ opacity: 1; transition: opacity 0.2s linear 0.15s; }}
     .filter-bar.fb-expanded #filter-chip-strip {{ opacity: 0; pointer-events: none; transition: opacity 0.15s linear; }}
@@ -1425,18 +1425,18 @@ def render_html(payload: dict[str, Any]) -> str:
 
     function setFilterBarExpanded(expanded) {{
       if (expanded) {{
-        filterRowsWrap.style.maxHeight = '';
+        filterRowsWrap.style.height = filterRowsWrap.scrollHeight + 'px';
         filterBarRoot.classList.add("fb-expanded");
-      }} else {{
-        // Pin inline max-height to actual scroll height before removing class so the
-        // transition starts from the real content height, not the CSS max-height ceiling.
-        // This eliminates the dead zone that made collapse feel sluggish at the start.
-        const h = filterRowsWrap.scrollHeight;
-        filterRowsWrap.style.maxHeight = h + 'px';
-        filterRowsWrap.offsetHeight; // force reflow before class removal
-        filterBarRoot.classList.remove("fb-expanded");
         filterRowsWrap.addEventListener('transitionend', function(e) {{
-          if (e.propertyName === 'max-height') filterRowsWrap.style.maxHeight = '';
+          if (e.propertyName === 'height') filterRowsWrap.style.height = 'auto';
+        }}, {{ once: true }});
+      }} else {{
+        filterRowsWrap.style.height = filterRowsWrap.scrollHeight + 'px';
+        filterRowsWrap.offsetHeight;
+        filterBarRoot.classList.remove("fb-expanded");
+        filterRowsWrap.style.height = '0';
+        filterRowsWrap.addEventListener('transitionend', function(e) {{
+          if (e.propertyName === 'height') filterRowsWrap.style.height = '';
         }}, {{ once: true }});
       }}
       try {{ localStorage.setItem("filter_bar_expanded", expanded ? "true" : "false"); }} catch(e) {{}}
@@ -1459,7 +1459,7 @@ def render_html(payload: dict[str, Any]) -> str:
     setFilterBarExpanded(initExpanded);
     requestAnimationFrame(() => requestAnimationFrame(() => {{
       filterBarRoot.classList.remove("fb-no-anim");
-      filterRowsWrap.style.maxHeight = '';
+      filterRowsWrap.style.height = isExpanded() ? 'auto' : '';
     }}));
 
     // --- Clear All inside filter box ---
