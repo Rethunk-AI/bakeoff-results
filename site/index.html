@@ -16,23 +16,24 @@
     th.sort-desc::after { content: " ▼"; font-size: 0.8em; color: #0969da; }
     .filter-bar { margin: 1rem 0 0 0; padding: .4rem .8rem; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee; }
     .filter-bar-header { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-    .filter-chevron { background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 0.1rem 0.3rem; border-radius: 3px; color: #444; line-height: 1; flex-shrink: 0; transform: rotate(-90deg); transition: transform 0.25s linear; }
+    .filter-chevron { background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 0.1rem 0.3rem; border-radius: 3px; color: #444; line-height: 1; flex-shrink: 0; transform: rotate(-90deg); transition: transform 0.2s linear; }
     .filter-bar.fb-expanded .filter-chevron { transform: rotate(0deg); }
     .filter-chevron:hover { background: #e8eaed; }
     .filter-bar-title { background: none; border: none; cursor: pointer; font-weight: bold; font-size: 1em; padding: 0; color: inherit; white-space: nowrap; flex-shrink: 0; }
     .filter-bar-title:hover { text-decoration: underline; }
-    .clear-all-btn { opacity: 0; pointer-events: none; transition: opacity 0.25s linear; }
+    .clear-all-btn { opacity: 0; pointer-events: none; transition: opacity 0.2s linear; }
     .filter-bar.fb-expanded .clear-all-btn { opacity: 1; pointer-events: auto; }
-    #filter-rows-wrap { overflow: hidden; height: 0; padding-top: 0.4rem; opacity: 0; transition: height 0.35s linear, opacity 0.35s linear; }
-    .filter-bar.fb-expanded #filter-rows-wrap { opacity: 1; transition: height 0.35s linear, opacity 0.25s linear; }
+    #filter-rows-wrap { overflow: hidden; height: 0; opacity: 0; transition: height 0.2s linear, opacity 0.2s linear; }
+    .filter-bar.fb-expanded #filter-rows-wrap { opacity: 1; transition: height 0.2s linear, opacity 0.2s linear; }
     .fb-no-anim, .fb-no-anim * { transition: none !important; }
-    #filter-chip-strip { opacity: 1; transition: opacity 0.2s linear 0.15s; }
-    .filter-bar.fb-expanded #filter-chip-strip { opacity: 0; pointer-events: none; transition: opacity 0.15s linear; }
+    #filter-chip-strip { opacity: 1; transition: opacity 0.1s linear 0.1s; }
+    .filter-bar.fb-expanded #filter-chip-strip { opacity: 0; pointer-events: none; transition: opacity 0.1s linear; }
     .filter-chip-strip { display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; min-width: 0; }
     .filter-chip { display: inline-flex; align-items: center; gap: 0.3rem; background: #ddf4ff; color: #0969da; border: 1px solid #b6daff; border-radius: 12px; padding: 2px 10px; font-size: 0.8em; }
     .filter-chip-clear { background: none; border: none; cursor: pointer; color: #0969da; font-size: 1em; padding: 0; line-height: 1; margin-left: 2px; }
     .filter-chip-clear:hover { color: #cf222e; }
     .filter-row { display: flex; column-gap: 1rem; row-gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .filter-rows-wrap > .filter-row:first-child { margin-top: 0.4rem; }
     .filter-group { flex: 1; min-width: 150px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.3rem 0.5rem; }
     .filter-group label { display: block; font-size: 0.85em; margin-bottom: 0.1rem; }
     .filter-group-controls { display: flex; align-items: center; gap: 0.25rem; }
@@ -89,7 +90,7 @@
 </head>
 <body>
   <h1>Rethunk Bakeoff Results</h1>
-  <p>From commit <code>b4da064</code> generated at 2026-05-30T21:34:42+00:00. This static index is backed by validated
+  <p>From commit <code>3107e70</code> generated at 2026-05-31T01:32:51+00:00. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar" id="filter-bar-root">
     <div class="filter-bar-header">
