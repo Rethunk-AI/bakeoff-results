@@ -543,10 +543,11 @@ def render_html(payload: dict[str, Any]) -> str:
     .filter-row {{ display: flex; column-gap: 1rem; row-gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }}
     .filter-rows-wrap > .filter-row:first-child {{ margin-top: 0.4rem; }}
     .filter-group {{ flex: 1; min-width: 150px; border: 1px solid #e0e0e0; border-radius: 5px; padding: 0.3rem 0.5rem; }}
-    .filter-group label {{ display: block; font-size: 0.85em; margin-bottom: 0.1rem; }}
+    .filter-group-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem; }}
+    .filter-group label {{ font-size: 0.85em; margin: 0; }}
     .filter-group-controls {{ display: flex; align-items: center; gap: 0.25rem; }}
     .filter-group-controls select {{ flex: 1; margin: 0; }}
-    .filter-add-btn {{ flex-shrink: 0; padding: 0.3rem 0.5rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; line-height: 1; }}
+    .filter-add-btn {{ padding: 0.15rem 0.35rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; line-height: 1; }}
     .filter-add-btn:hover {{ background: #e8eaed; }}
     .multi-panel {{ margin-top: 0.3rem; padding: 0.4rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; max-height: 180px; overflow-y: auto; display: none; }}
     .multi-panel.active {{ display: block; }}
@@ -610,42 +611,52 @@ def render_html(payload: dict[str, Any]) -> str:
     <div id="filter-rows-wrap" class="filter-rows-wrap">
       <div class="filter-row">
         <div class="filter-group" data-filter-id="f-family">
-          <label for="f-family">Model Family</label>
+          <div class="filter-group-header">
+            <label for="f-family">Model Family</label>
+            <button class="filter-add-btn" data-target="f-family" title="Add value (multi-select)">+</button>
+          </div>
           <div class="filter-group-controls">
             <select id="f-family"><option value="">All</option></select>
-            <button class="filter-add-btn" data-target="f-family" title="Add value (multi-select)">+</button>
           </div>
           <div class="multi-panel" id="mp-f-family"></div>
         </div>
         <div class="filter-group" data-filter-id="f-arch">
-          <label for="f-arch">Architecture</label>
+          <div class="filter-group-header">
+            <label for="f-arch">Architecture</label>
+            <button class="filter-add-btn" data-target="f-arch" title="Add value (multi-select)">+</button>
+          </div>
           <div class="filter-group-controls">
             <select id="f-arch"><option value="">All</option></select>
-            <button class="filter-add-btn" data-target="f-arch" title="Add value (multi-select)">+</button>
           </div>
           <div class="multi-panel" id="mp-f-arch"></div>
         </div>
         <div class="filter-group" data-filter-id="f-quant">
-          <label for="f-quant">Quantization</label>
+          <div class="filter-group-header">
+            <label for="f-quant">Quantization</label>
+            <button class="filter-add-btn" data-target="f-quant" title="Add value (multi-select)">+</button>
+          </div>
           <div class="filter-group-controls">
             <select id="f-quant"><option value="">All</option></select>
-            <button class="filter-add-btn" data-target="f-quant" title="Add value (multi-select)">+</button>
           </div>
           <div class="multi-panel" id="mp-f-quant"></div>
         </div>
         <div class="filter-group" data-filter-id="f-gpu">
-          <label for="f-gpu">GPU Architecture</label>
+          <div class="filter-group-header">
+            <label for="f-gpu">GPU Architecture</label>
+            <button class="filter-add-btn" data-target="f-gpu" title="Add value (multi-select)">+</button>
+          </div>
           <div class="filter-group-controls">
             <select id="f-gpu"><option value="">All</option></select>
-            <button class="filter-add-btn" data-target="f-gpu" title="Add value (multi-select)">+</button>
           </div>
           <div class="multi-panel" id="mp-f-gpu"></div>
         </div>
         <div class="filter-group" data-filter-id="f-state">
-          <label for="f-state">Result State</label>
+          <div class="filter-group-header">
+            <label for="f-state">Result State</label>
+            <button class="filter-add-btn" data-target="f-state" title="Add value (multi-select)">+</button>
+          </div>
           <div class="filter-group-controls">
             <select id="f-state"><option value="">All</option></select>
-            <button class="filter-add-btn" data-target="f-state" title="Add value (multi-select)">+</button>
           </div>
           <div class="multi-panel" id="mp-f-state"></div>
         </div>
@@ -921,6 +932,13 @@ def render_html(payload: dict[str, Any]) -> str:
       }});
     }}
 
+    function updateFilterBtn(id, mode) {{
+      const btn = document.querySelector('.filter-add-btn[data-target="' + id + '"]');
+      if (!btn) return;
+      if (mode === "multi") {{ btn.textContent = "×"; btn.title = "Remove multi-select"; }}
+      else {{ btn.textContent = "+"; btn.title = "Add value (multi-select)"; }}
+    }}
+
     function switchToMulti(id) {{
       filterMode[id] = "multi";
       const sel = document.getElementById(id);
@@ -934,6 +952,7 @@ def render_html(payload: dict[str, Any]) -> str:
         buildMultiPanel(id);
         panel.classList.add("active");
       }}
+      updateFilterBtn(id, "multi");
       saveFilterState();
       applyFilters();
       renderChips();
@@ -947,6 +966,7 @@ def render_html(payload: dict[str, Any]) -> str:
       sel.style.display = "";
       const panel = document.getElementById("mp-" + id);
       if (panel) panel.classList.remove("active");
+      updateFilterBtn(id, "single");
       saveFilterState();
       applyFilters();
       renderChips();
@@ -962,6 +982,7 @@ def render_html(payload: dict[str, Any]) -> str:
             buildMultiPanel(id);
             panel.classList.add("active");
           }}
+          updateFilterBtn(id, "multi");
         }}
       }});
     }}
