@@ -549,7 +549,7 @@ def render_html(payload: dict[str, Any]) -> str:
     .filter-group-controls select {{ flex: 1; margin: 0; }}
     .filter-add-btn {{ padding: 0.15rem 0.35rem; background: #f6f8fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.85em; line-height: 1; }}
     .filter-add-btn:hover {{ background: #e8eaed; }}
-    .multi-panel {{ padding: 0.1rem 0.4rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; max-height: 180px; overflow-y: auto; display: none; }}
+    .multi-panel {{ padding: 0.05rem 0.4rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; max-height: 180px; overflow-y: auto; display: none; }}
     .multi-panel.active {{ display: block; }}
     .multi-panel label {{ display: flex; align-items: center; gap: 0.4rem; font-size: 0.85em; margin: 0.2rem 0; cursor: pointer; font-weight: normal; }}
     .multi-panel input[type=checkbox] {{ width: auto; margin: 0; padding: 0; }}
