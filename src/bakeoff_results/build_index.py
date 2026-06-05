@@ -162,11 +162,24 @@ VALID_STATES = ("superseded", "disputed", "revoked", "incomplete", "failed")
 
 
 def _state(result: dict[str, Any], manifest: dict[str, Any]) -> str | None:
-    """Result state for badge rendering. Read from result or manifest.
+    """Result state for badge rendering.
+
+    Reading priority (bakeoff#23 schema → legacy back-compat):
+    1. ``run_status`` in result (harness-emitted worst-of aggregate; values
+       "complete"/"incomplete"/"failed"). "complete" is not in VALID_STATES so
+       it yields no badge — complete runs render cleanly without clutter.
+    2. ``run_status`` in manifest (summary field written by publish.py).
+    3. Legacy ``state`` field in result or manifest (pre-#23 bundles).
 
     Returns a recognized lowercase state, or None when absent/unrecognized so
-    accepted runs render no badge (graceful degradation — most bundles today
-    carry no state field yet)."""
+    accepted runs render no badge (graceful degradation — bundles without the
+    new fields continue to render cleanly)."""
+    # Priority 1 & 2: bakeoff#23 run_status (harness-emitted, worst-of aggregate)
+    for source in (result, manifest):
+        value = source.get("run_status")
+        if isinstance(value, str) and value.strip().lower() in VALID_STATES:
+            return value.strip().lower()
+    # Priority 3: legacy state field (pre-#23 bundles and hand-authored fixtures)
     for source in (result, manifest):
         value = source.get("state")
         if isinstance(value, str) and value.strip().lower() in VALID_STATES:
@@ -182,9 +195,41 @@ def _outcome(result: dict[str, Any]) -> str | None:
     return None
 
 
-def _failure_reason(result: dict[str, Any]) -> str | None:
-    """Why/how a run did not complete, when present. Display side of #9 — the
-    harness must emit this upstream (Rethunk-AI/bakeoff) before it is populated."""
+def _model_scores_list(result: dict[str, Any], manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return per-model score entries from the bakeoff#23 schema.
+
+    Reads ``model_scores`` from result.json (canonical, full) first; falls back
+    to ``model_scores_summary`` from manifest.json (written by publish.py as a
+    5-key projection). Returns [] when neither is present so callers can branch
+    without guarding."""
+    raw = result.get("model_scores")
+    if not isinstance(raw, list):
+        raw = manifest.get("model_scores_summary")
+    if not isinstance(raw, list):
+        return []
+    return [entry for entry in raw if isinstance(entry, dict)]
+
+
+def _failure_reason(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> str | None:
+    """Why/how a run did not complete, when present.
+
+    Reading priority (bakeoff#23 schema → legacy back-compat):
+    1. ``dominant_failure_code`` from the worst-status model in model_scores
+       (synthesized display string, e.g. "timeout" or "oom").
+    2. Legacy top-level ``failure_reason``, ``failure``, or ``error`` fields.
+
+    None when no failure information is present."""
+    # Priority 1: synthesize from per-model scores (bakeoff#23 schema)
+    scores = _model_scores_list(result, manifest or {})
+    if scores:
+        # Pick the worst-status model's dominant_failure_code as the run summary.
+        # Status rank: failed > incomplete > complete (absent treated as complete).
+        _rank = {"failed": 2, "incomplete": 1, "complete": 0}
+        worst = max(scores, key=lambda s: _rank.get(str(s.get("status") or ""), 0))
+        code = worst.get("dominant_failure_code")
+        if isinstance(code, str) and code.strip():
+            return code.strip()
+    # Priority 2: legacy top-level fields (pre-#23 bundles)
     for key in ("failure_reason", "failure", "error"):
         value = result.get(key)
         if isinstance(value, str) and value.strip():
@@ -192,11 +237,36 @@ def _failure_reason(result: dict[str, Any]) -> str | None:
     return None
 
 
-def _score(result: dict[str, Any]) -> str | None:
-    """Relative/partial score so weak or non-finishing runs still rank (#9).
+def _score(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> str | None:
+    """Relative/partial score so weak or non-finishing runs still rank (#9, #27).
 
-    Accepts `score` or `partial_score` as number or string; normalized to a
-    short display string. None when absent."""
+    Reading priority (bakeoff#23 schema → legacy back-compat):
+    1. Mean ``partial_score`` across model_scores entries whose status is not
+       "complete" (incomplete qualifier: rendered as e.g. "0.42 (incomplete)").
+       For fully-complete runs model_scores exists but no entry is incomplete,
+       so this branch is skipped and the run falls through to None — no score
+       badge on fully-complete runs (badge-absence signals success).
+    2. Legacy top-level ``score`` or ``partial_score`` as number or string.
+
+    None when absent."""
+    # Priority 1: bakeoff#23 model_scores partial scores
+    scores = _model_scores_list(result, manifest or {})
+    if scores:
+        non_complete = [
+            s for s in scores
+            if str(s.get("status") or "") in ("incomplete", "failed")
+        ]
+        if non_complete:
+            vals = [
+                float(s["partial_score"])
+                for s in non_complete
+                if isinstance(s.get("partial_score"), (int, float))
+                and not isinstance(s.get("partial_score"), bool)
+            ]
+            if vals:
+                mean_score = sum(vals) / len(vals)
+                return f"{mean_score:.2g}"
+    # Priority 2: legacy top-level fields (pre-#23 bundles and hand-authored fixtures)
     for key in ("score", "partial_score"):
         value = result.get(key)
         if isinstance(value, bool):
@@ -206,6 +276,26 @@ def _score(result: dict[str, Any]) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+def _model_scores_detail(
+    result: dict[str, Any], manifest: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Return per-model display rows for the actions-menu detail (bakeoff#27).
+
+    Each entry: {model_id, status, partial_score, dominant_failure_code}.
+    Empty list when no model_scores data is present (back-compat — older bundles
+    render no per-model detail, only the run-level failure reason if any)."""
+    return [
+        {
+            "model_id": str(s.get("model_id") or ""),
+            "status": str(s.get("status") or ""),
+            "partial_score": s.get("partial_score"),
+            "dominant_failure_code": s.get("dominant_failure_code"),
+        }
+        for s in _model_scores_list(result, manifest)
+        if s.get("model_id")
+    ]
 
 
 def _cohort(entry: dict[str, Any]) -> str:
@@ -241,8 +331,9 @@ def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
         "hardware": _hardware(result),
         "state": _state(result, bundle.manifest),
         "outcome": _outcome(result),
-        "failure_reason": _failure_reason(result),
-        "score": _score(result),
+        "failure_reason": _failure_reason(result, bundle.manifest),
+        "score": _score(result, bundle.manifest),
+        "model_scores_detail": _model_scores_detail(result, bundle.manifest),
         "bundle_path": bundle.path.as_posix(),
     }
     entry["cohort"] = _cohort(entry)
@@ -459,7 +550,7 @@ def render_html(payload: dict[str, Any]) -> str:
         cells_html += '<td class="similar-results-col" style="display:none"></td>'
         cells_html += f"<td class='hw-col-td' style='display:none'>{_hw_cell_html(hw)}</td>"
 
-        # Per-row Actions menu (⋮): config hash copy + failure reason when present
+        # Per-row Actions menu (⋮): config hash copy + failure/score detail when present
         cfg_escaped = html.escape(config_hash, quote=True)
         menu_items = ""
         if config_hash:
@@ -467,6 +558,36 @@ def render_html(payload: dict[str, Any]) -> str:
                 f'<button class="actions-menu-item" data-copy="{cfg_escaped}">'
                 f'Copy config hash</button>'
             )
+        # Per-model score/failure detail (bakeoff#27 / bakeoff#23 schema).
+        # model_scores_detail is a list of {model_id, status, partial_score,
+        # dominant_failure_code}. Each non-complete model gets one detail row
+        # showing its partial score + failure code. Back-compat: list is empty
+        # for pre-#23 bundles so nothing extra renders.
+        model_detail = entry.get("model_scores_detail") or []
+        for ms in model_detail:
+            ms_mid = str(ms.get("model_id") or "")
+            ms_status = str(ms.get("status") or "")
+            ms_score = ms.get("partial_score")
+            ms_code = ms.get("dominant_failure_code")
+            if not ms_mid:
+                continue
+            # Build display line: "model: score (incomplete) — failure_code"
+            parts = []
+            if isinstance(ms_score, (int, float)) and not isinstance(ms_score, bool):
+                score_str = f"{ms_score:.2g}"
+                if ms_status != "complete":
+                    score_str += f" ({ms_status or 'incomplete'})"
+                parts.append(score_str)
+            elif ms_status and ms_status != "complete":
+                parts.append(ms_status)
+            if isinstance(ms_code, str) and ms_code.strip():
+                parts.append(ms_code.strip())
+            detail_text = f"{html.escape(ms_mid)}: " + html.escape(" — ".join(parts)) if parts else html.escape(ms_mid)
+            menu_items += (
+                f'<div class="actions-menu-info">{detail_text}</div>'
+            )
+        # Run-level failure reason: shown after per-model detail as a summary
+        # (or alone for legacy bundles that carry it as a top-level field).
         if failure_reason:
             menu_items += (
                 f'<div class="actions-menu-info" title="{html.escape(failure_reason, quote=True)}">'
