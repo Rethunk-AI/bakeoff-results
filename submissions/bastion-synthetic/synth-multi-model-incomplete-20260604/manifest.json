@@ -1,44 +1,28 @@
 {
-  "config_hash": "synth-multi-20260604",
+  "config_hash": "synth-single-load-failure-20260604",
   "created_at": "2026-06-04T06:00:00Z",
   "files": {
     "result.json": {
-      "sha256": "b5a6f4347960a00084bf7a037a483ac867ccfc513ffc608fb2d677b319d40a29"
+      "sha256": "30386e09079344280e548d197255f14451865943f534e9c0318895d376fc8f0f"
     },
     "summary.md": {
-      "sha256": "dd3e53c2960dd1880b1540d93d03d5a908ffd804c68a5c45f9a82ba63f9f58be"
+      "sha256": "fb3c0b82252f72208c8830e2e1c8699f27d87b8cb5f2942fe99cfe69827086b2"
     }
   },
   "judge_mode": "none",
   "model_ids": [
-    "meta-llama/Meta-Llama-3.1-8B-Instruct",
-    "mistralai/Mistral-7B-Instruct-v0.3",
-    "microsoft/Phi-3.5-mini-instruct"
+    "synthetic/FakeModel-1.0-load_failure"
   ],
   "model_scores_summary": [
     {
-      "dominant_failure_code": null,
-      "floor_score": 1.0,
-      "model_id": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-      "partial_score": 0.78,
-      "status": "complete"
-    },
-    {
-      "dominant_failure_code": "timeout",
-      "floor_score": 0.8,
-      "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
-      "partial_score": 0.53,
-      "status": "incomplete"
-    },
-    {
       "dominant_failure_code": "load_failure",
       "floor_score": null,
-      "model_id": "microsoft/Phi-3.5-mini-instruct",
+      "model_id": "synthetic/FakeModel-1.0-load_failure",
       "partial_score": 0.0,
       "status": "failed"
     }
   ],
-  "run_id": "synth-multi-model-incomplete-20260604",
+  "run_id": "synth-single-model-load-failure-20260604",
   "run_status": "failed",
   "schema_version": "bakeoff-results/v1",
   "signature": {
