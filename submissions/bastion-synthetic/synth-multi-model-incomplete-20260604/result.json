@@ -1,58 +1,32 @@
 {
-  "run_id": "synth-multi-model-incomplete-20260604",
+  "run_id": "synth-single-model-load-failure-20260604",
   "timestamp": "2026-06-04T06:00:00Z",
   "run_status": "failed",
   "config": {
     "models": [
-      {"id": "meta-llama/Meta-Llama-3.1-8B-Instruct", "gguf": "org/repo/llama31-8b-Q4_K_M.gguf"},
-      {"id": "mistralai/Mistral-7B-Instruct-v0.3", "gguf": "org/repo/mistral7b-Q4_K_M.gguf"},
-      {"id": "microsoft/Phi-3.5-mini-instruct", "gguf": "org/repo/phi35-mini-Q4_K_M.gguf"}
+      {"id": "synthetic/FakeModel-1.0-load_failure", "gguf": "synthetic/fake-model-1.0-load-failure.gguf"}
     ],
     "prompts": [{"id": "plain", "system": "Answer concisely."}],
     "judge": {"enabled": false, "mode": "none"}
   },
   "provenance": {
-    "config_hash": "synth-multi-20260604",
+    "config_hash": "synth-single-load-failure-20260604",
     "seed": 42,
     "git": {"sha": "5f7a3b2c1d", "branch": "main", "dirty": false}
   },
   "model_metadata": [
-    {"id": "meta-llama/Meta-Llama-3.1-8B-Instruct", "gguf": "org/repo/llama31-8b-Q4_K_M.gguf",
-     "model_family": "LLaMA", "parameters": "8B", "quantization": "Q4_K_M", "context_length": "128K"},
-    {"id": "mistralai/Mistral-7B-Instruct-v0.3", "gguf": "org/repo/mistral7b-Q4_K_M.gguf",
-     "model_family": "Mistral", "parameters": "7B", "quantization": "Q4_K_M", "context_length": "32K"},
-    {"id": "microsoft/Phi-3.5-mini-instruct", "gguf": "org/repo/phi35-mini-Q4_K_M.gguf",
-     "model_family": "Phi", "parameters": "3.8B", "quantization": "Q4_K_M", "context_length": "128K"}
+    {
+      "id": "synthetic/FakeModel-1.0-load_failure",
+      "gguf": "synthetic/fake-model-1.0-load-failure.gguf",
+      "model_family": "synthetic",
+      "parameters": "unknown",
+      "quantization": "none",
+      "context_length": "unknown"
+    }
   ],
   "model_scores": [
     {
-      "model_id": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-      "status": "complete",
-      "cells_total": 20,
-      "cells_attempted": 20,
-      "cells_failed": 0,
-      "completeness": 1.0,
-      "partial_score": 0.78,
-      "dominant_failure_code": null,
-      "floor_score": 1.0,
-      "floor_cells_passed": 5,
-      "floor_cells_total": 5
-    },
-    {
-      "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
-      "status": "incomplete",
-      "cells_total": 20,
-      "cells_attempted": 14,
-      "cells_failed": 6,
-      "completeness": 0.7,
-      "partial_score": 0.53,
-      "dominant_failure_code": "timeout",
-      "floor_score": 0.8,
-      "floor_cells_passed": 4,
-      "floor_cells_total": 5
-    },
-    {
-      "model_id": "microsoft/Phi-3.5-mini-instruct",
+      "model_id": "synthetic/FakeModel-1.0-load_failure",
       "status": "failed",
       "cells_total": 20,
       "cells_attempted": 0,
@@ -62,7 +36,8 @@
       "dominant_failure_code": "load_failure",
       "floor_score": null,
       "floor_cells_passed": null,
-      "floor_cells_total": null
+      "floor_cells_total": null,
+      "run_status": "failed"
     }
   ],
   "hardware": {
@@ -71,18 +46,6 @@
     "device_pci": "1002:15bf"
   },
   "tasks": [{"id": "t1", "domain": "qa", "user_prompt": "What is the capital of France?"}],
-  "records": [
-    {
-      "task_id": "t1",
-      "prompt_id": "plain",
-      "model_id": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-      "text": "Paris.",
-      "wall_clock_seconds": 1.2,
-      "quality_heuristic": 1.0,
-      "failure_code": null,
-      "failure_detail": null,
-      "error": null
-    }
-  ],
+  "records": [],
   "judgements": []
 }
