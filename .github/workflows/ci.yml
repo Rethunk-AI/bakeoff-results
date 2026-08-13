@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-    - main
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,90 +20,96 @@ jobs:
       contents: read
 
     steps:
-    - name: Check out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      with:
-        fetch-depth: 0
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
-    - name: Verify signers.yaml commit signature
-      run: |
-        # Check if the last commit touching signers.yaml is signed
-        last_commit=$(git log --format=%H -1 -- signers.yaml)
-        if [ -z "$last_commit" ]; then
-          echo "No commits found for signers.yaml; skipping signature check"
-          exit 0
-        fi
-
-        signature=$(git log --format=%B "$last_commit" | grep -i "gpgsig\|ssh")
-        if [ -z "$signature" ]; then
-          echo "WARNING: Last commit to signers.yaml is not GPG/SSH signed"
-          echo "Commit: $last_commit"
-          echo "For production, this should trigger a hard failure."
-          exit 0
-        fi
-        echo "INFO: signers.yaml commit is signed"
-
-    - name: Set up Python
-      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-      with:
-        python-version: "3.12"
-
-    - name: Compile Python
-      run: python -m compileall src tests
-
-    - name: Run tests
-      run: PYTHONPATH=src python -m unittest discover -s tests
-
-    - name: Validate submissions
-      run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
-
-    - name: Install cosign
-      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-    - name: Advisory Sigstore bundle check (non-blocking)
-      continue-on-error: true
-      run: |
-        echo "============================================================"
-        echo "ADVISORY: cosign verify-blob check — NOT gating this job."
-        echo "Existing submissions carry stub signature.sigstore.json files"
-        echo "that are not real Sigstore bundles. Full enforcement is"
-        echo "deferred until the upstream submitting workflow stabilises."
-        echo "TODO: promote to a hard gate — see issue #23."
-        echo "============================================================"
-
-        found=0
-        while IFS= read -r bundle; do
-          found=$((found + 1))
-          signed_file="$(dirname "$bundle")/manifest.json"
-          echo ""
-          echo "Bundle: $bundle"
-          if [ ! -f "$signed_file" ]; then
-            echo "  SKIP: expected signed file not found at $signed_file"
-            continue
+      - name: Verify signers.yaml commit signature
+        run: |
+          # Check if the last commit touching signers.yaml is signed
+          last_commit=$(git log --format=%H -1 -- signers.yaml)
+          if [ -z "$last_commit" ]; then
+            echo "No commits found for signers.yaml; skipping signature check"
+            exit 0
           fi
-          echo "  Signed file: $signed_file"
-          echo "  Attempting cosign verify-blob (advisory, failures expected on stubs)..."
-          cosign verify-blob \
-            --bundle "$bundle" \
-            --certificate-identity-regexp ".*" \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            "$signed_file" 2>&1 \
-            && echo "  RESULT: PASS" \
-            || echo "  RESULT: FAIL (advisory — not blocking; stub bundle or missing real signature)"
-        done < <(find submissions -name "signature.sigstore.json")
 
-        if [ "$found" -eq 0 ]; then
-          echo "No signature.sigstore.json files found in submissions/ — nothing to verify."
-        else
-          echo ""
-          echo "Advisory check complete. $found bundle(s) examined. See above for per-bundle results."
-        fi
-        echo "============================================================"
-        echo "ADVISORY step done. Job continues regardless of outcome."
-        echo "============================================================"
+          signature=$(git log --format=%B "$last_commit" | grep -i "gpgsig\|ssh")
+          if [ -z "$signature" ]; then
+            echo "WARNING: Last commit to signers.yaml is not GPG/SSH signed"
+            echo "Commit: $last_commit"
+            echo "For production, this should trigger a hard failure."
+            exit 0
+          fi
+          echo "INFO: signers.yaml commit is signed"
 
-    - name: Build static index
-      run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python
+        run: python -m compileall src tests
+
+      - name: Run tests
+        run: PYTHONPATH=src python -m unittest discover -s tests
+
+      - name: Validate submissions
+        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Advisory Sigstore bundle check (non-blocking)
+        continue-on-error: true
+        run: |
+          echo "============================================================"
+          echo "ADVISORY: cosign verify-blob check — NOT gating this job."
+          echo "No submission carries a signature.sigstore.json yet: upstream"
+          echo "package-results.yml is workflow_dispatch-only and has never run,"
+          echo "so nothing here has been signed by the identity signers.yaml"
+          echo "trusts. Full enforcement is deferred until it emits real bundles."
+          echo "TODO: promote to a hard gate — see issue #23."
+          echo "A hard gate is vacuous until then: zero bundles found means zero"
+          echo "verifications performed, which would pass while proving nothing."
+          echo "============================================================"
+
+          found=0
+          while IFS= read -r bundle; do
+            found=$((found + 1))
+            bundle_dir="$(dirname "$bundle")"
+            # The manifest names which file the signature covers; upstream
+            # signs result.json, so verifying manifest.json would always fail.
+            signed_file="$bundle_dir/$(jq -r '.signature.signed_file // "result.json"' "$bundle_dir/manifest.json" 2>/dev/null || echo result.json)"
+            echo ""
+            echo "Bundle: $bundle"
+            if [ ! -f "$signed_file" ]; then
+              echo "  SKIP: expected signed file not found at $signed_file"
+              continue
+            fi
+            echo "  Signed file: $signed_file"
+            echo "  Attempting cosign verify-blob (advisory, failures do not block)..."
+            cosign verify-blob \
+              --bundle "$bundle" \
+              --certificate-identity-regexp ".*" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "$signed_file" 2>&1 \
+              && echo "  RESULT: PASS" \
+              || echo "  RESULT: FAIL (advisory — not blocking; unsigned or untrusted signature)"
+          done < <(find submissions -name "signature.sigstore.json")
+
+          if [ "$found" -eq 0 ]; then
+            echo "No signature.sigstore.json files found in submissions/ — nothing to verify."
+          else
+            echo ""
+            echo "Advisory check complete. $found bundle(s) examined. See above for per-bundle results."
+          fi
+          echo "============================================================"
+          echo "ADVISORY step done. Job continues regardless of outcome."
+          echo "============================================================"
+
+      - name: Build static index
+        run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
 
   publish:
     needs: verify
@@ -119,55 +125,55 @@ jobs:
       pages: write
 
     steps:
-    - name: Check out repository
-      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      with:
-        fetch-depth: 0
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
-    - name: Verify signers.yaml commit signature
-      run: |
-        # Check if the last commit touching signers.yaml is signed
-        last_commit=$(git log --format=%H -1 -- signers.yaml)
-        if [ -z "$last_commit" ]; then
-          echo "No commits found for signers.yaml; skipping signature check"
-          exit 0
-        fi
+      - name: Verify signers.yaml commit signature
+        run: |
+          # Check if the last commit touching signers.yaml is signed
+          last_commit=$(git log --format=%H -1 -- signers.yaml)
+          if [ -z "$last_commit" ]; then
+            echo "No commits found for signers.yaml; skipping signature check"
+            exit 0
+          fi
 
-        signature=$(git log --format=%B "$last_commit" | grep -i "gpgsig\|ssh")
-        if [ -z "$signature" ]; then
-          echo "WARNING: Last commit to signers.yaml is not GPG/SSH signed"
-          echo "Commit: $last_commit"
-          echo "For production, this should trigger a hard failure."
-          exit 0
-        fi
-        echo "INFO: signers.yaml commit is signed"
+          signature=$(git log --format=%B "$last_commit" | grep -i "gpgsig\|ssh")
+          if [ -z "$signature" ]; then
+            echo "WARNING: Last commit to signers.yaml is not GPG/SSH signed"
+            echo "Commit: $last_commit"
+            echo "For production, this should trigger a hard failure."
+            exit 0
+          fi
+          echo "INFO: signers.yaml commit is signed"
 
-    - name: Set up Python
-      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-      with:
-        python-version: "3.12"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
 
-    - name: Validate submissions
-      run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
+      - name: Validate submissions
+        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
 
-    - name: Build static index
-      run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
+      - name: Build static index
+        run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
 
-    - name: Attest site artifacts
-      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
-      with:
-        subject-path: |
-          site/index.json
-          site/index.html
+      - name: Attest site artifacts
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: |
+            site/index.json
+            site/index.html
 
-    - name: Configure Pages
-      uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
-    - name: Upload Pages artifact
-      uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
-      with:
-        path: ./site
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ./site
 
-    - name: Deploy to GitHub Pages
-      id: deploy
-      uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
