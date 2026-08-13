@@ -195,7 +195,9 @@ def _outcome(result: dict[str, Any]) -> str | None:
     return None
 
 
-def _model_scores_list(result: dict[str, Any], manifest: dict[str, Any]) -> list[dict[str, Any]]:
+def _model_scores_list(
+    result: dict[str, Any], manifest: dict[str, Any]
+) -> list[dict[str, Any]]:
     """Return per-model score entries from the bakeoff#23 schema.
 
     Reads ``model_scores`` from result.json (canonical, full) first; falls back
@@ -210,7 +212,9 @@ def _model_scores_list(result: dict[str, Any], manifest: dict[str, Any]) -> list
     return [entry for entry in raw if isinstance(entry, dict)]
 
 
-def _failure_reason(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> str | None:
+def _failure_reason(
+    result: dict[str, Any], manifest: dict[str, Any] | None = None
+) -> str | None:
     """Why/how a run did not complete, when present.
 
     Reading priority (bakeoff#23 schema → legacy back-compat):
@@ -237,7 +241,9 @@ def _failure_reason(result: dict[str, Any], manifest: dict[str, Any] | None = No
     return None
 
 
-def _score(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> str | None:
+def _score(
+    result: dict[str, Any], manifest: dict[str, Any] | None = None
+) -> str | None:
     """Relative/partial score so weak or non-finishing runs still rank (#9, #27).
 
     Reading priority (bakeoff#23 schema → legacy back-compat):
@@ -253,8 +259,7 @@ def _score(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> st
     scores = _model_scores_list(result, manifest or {})
     if scores:
         non_complete = [
-            s for s in scores
-            if str(s.get("status") or "") in ("incomplete", "failed")
+            s for s in scores if str(s.get("status") or "") in ("incomplete", "failed")
         ]
         if non_complete:
             vals = [
@@ -376,18 +381,33 @@ def build_index(submissions_dir: Path | str, site_dir: Path | str) -> dict[str, 
     return payload
 
 
-def _hw_tier(hw: str | dict) -> str:
+def _hw_tier(hw: str | dict) -> tuple[str, int]:
     """Classify hardware into tier + vram_mb (for range filtering)."""
     if not isinstance(hw, dict):
         return ("unknown", -1)
     name = hw.get("device_name", "")
     vram = hw.get("vram_gb")
-    pci = hw.get("device_pci", "")
     # GPU detection
     gpu_keywords = (
-        "GPU", "RTX", "A100", "H100", "V100", "MI250", "MI300", "A6000",
-        "L40", "H200", "B200", "GB100", "MPSA", "MPSB", "MPSL", "B2",
-        "M40", "M60", "M61",
+        "GPU",
+        "RTX",
+        "A100",
+        "H100",
+        "V100",
+        "MI250",
+        "MI300",
+        "A6000",
+        "L40",
+        "H200",
+        "B200",
+        "GB100",
+        "MPSA",
+        "MPSB",
+        "MPSL",
+        "B2",
+        "M40",
+        "M60",
+        "M61",
     )
     if any(k in name.upper() for k in gpu_keywords):
         tier = "GPU"
@@ -417,11 +437,11 @@ def _gpu_arch_family(hw: str | dict) -> str:
     # PCI ID mapping for known families
     pci_map = {
         # NVIDIA
-        "10de:2204": "Ada Lovelace",   # RTX 4090
-        "10de:a000": "Ampere",          # A100
-        "10de:2334": "Hopper",          # H100
-        "10de:20b2": "Ampere",          # V100
-        "10de:2350": "Hopper",          # H200
+        "10de:2204": "Ada Lovelace",  # RTX 4090
+        "10de:a000": "Ampere",  # A100
+        "10de:2334": "Hopper",  # H100
+        "10de:20b2": "Ampere",  # V100
+        "10de:2350": "Hopper",  # H200
         # AMD
         "1002:15bf": "AMD RDNA3/Strix Halo",
     }
@@ -464,6 +484,7 @@ def _params_snap_points(entries: list[dict[str, Any]]) -> list[int]:
     One stop per data value (rounded to nearest integer), one midpoint between
     adjacent stops, one stop above the max. No fixed-resolution tiers.
     """
+
     def _extract(e: dict[str, Any]) -> float | None:
         p = str(e.get("params_total") or "")
         m = re.search(r"([\d.]+)", p)
@@ -528,7 +549,7 @@ def render_html(payload: dict[str, Any]) -> str:
         if score:
             badges += (
                 f'<span class="score-badge" title="Relative score">'
-                f'{html.escape(str(score))}</span>'
+                f"{html.escape(str(score))}</span>"
             )
         run_id_cell = f"<td>{badges}{html.escape(str(entry.get('run_id') or ''))}</td>"
         plain_cells = [
@@ -548,7 +569,9 @@ def render_html(payload: dict[str, Any]) -> str:
         )
         # Similar Results column (hidden by default — JS will populate badge content)
         cells_html += '<td class="similar-results-col" style="display:none"></td>'
-        cells_html += f"<td class='hw-col-td' style='display:none'>{_hw_cell_html(hw)}</td>"
+        cells_html += (
+            f"<td class='hw-col-td' style='display:none'>{_hw_cell_html(hw)}</td>"
+        )
 
         # Per-row Actions menu (⋮): config hash copy + failure/score detail when present
         cfg_escaped = html.escape(config_hash, quote=True)
@@ -556,7 +579,7 @@ def render_html(payload: dict[str, Any]) -> str:
         if config_hash:
             menu_items += (
                 f'<button class="actions-menu-item" data-copy="{cfg_escaped}">'
-                f'Copy config hash</button>'
+                f"Copy config hash</button>"
             )
         # Per-model score/failure detail (bakeoff#27 / bakeoff#23 schema).
         # model_scores_detail is a list of {model_id, status, partial_score,
@@ -582,23 +605,25 @@ def render_html(payload: dict[str, Any]) -> str:
                 parts.append(ms_status)
             if isinstance(ms_code, str) and ms_code.strip():
                 parts.append(ms_code.strip())
-            detail_text = f"{html.escape(ms_mid)}: " + html.escape(" — ".join(parts)) if parts else html.escape(ms_mid)
-            menu_items += (
-                f'<div class="actions-menu-info">{detail_text}</div>'
+            detail_text = (
+                f"{html.escape(ms_mid)}: " + html.escape(" — ".join(parts))
+                if parts
+                else html.escape(ms_mid)
             )
+            menu_items += f'<div class="actions-menu-info">{detail_text}</div>'
         # Run-level failure reason: shown after per-model detail as a summary
         # (or alone for legacy bundles that carry it as a top-level field).
         if failure_reason:
             menu_items += (
                 f'<div class="actions-menu-info" title="{html.escape(failure_reason, quote=True)}">'
-                f'Failure: {html.escape(failure_reason)}</div>'
+                f"Failure: {html.escape(failure_reason)}</div>"
             )
         if menu_items:
             actions_cell = (
                 f'<td class="actions-cell">'
                 f'<button class="actions-btn" title="Row actions">&#8942;</button>'
                 f'<div class="actions-menu">{menu_items}</div>'
-                f'</td>'
+                f"</td>"
             )
         else:
             actions_cell = '<td class="actions-cell"></td>'
@@ -619,13 +644,17 @@ def render_html(payload: dict[str, Any]) -> str:
             "cohort": cohort,
         }
         str_data = {k: str(v) for k, v in data.items()}
-        attrs = " ".join(f'data-{k}="{html.escape(v, quote=True)}"' for k, v in str_data.items())
+        attrs = " ".join(
+            f'data-{k}="{html.escape(v, quote=True)}"' for k, v in str_data.items()
+        )
         rows.append(f"<tr class='data-row' {attrs}>{cells_html}{actions_cell}</tr>")
 
     generated_at = html.escape(str(payload["generated_at"]))
     git_hash = html.escape(str(payload.get("git_hash", "")))
-    body_rows = "\n".join(rows) if rows else (
-        '<tr><td colspan="14">No submissions have been published yet.</td></tr>'
+    body_rows = (
+        "\n".join(rows)
+        if rows
+        else ('<tr><td colspan="14">No submissions have been published yet.</td></tr>')
     )
     return f"""<!doctype html>
 <html lang="en">
@@ -720,7 +749,7 @@ def render_html(payload: dict[str, Any]) -> str:
 </head>
 <body>
   <h1>Rethunk Bakeoff Results</h1>
-  <p>{'From commit <code>' + git_hash + '</code> generated at ' if git_hash else 'Generated at '}{generated_at}. This static index is backed by validated
+  <p>{"From commit <code>" + git_hash + "</code> generated at " if git_hash else "Generated at "}{generated_at}. This static index is backed by validated
   result bundles and is private until publication is approved.</p>
   <div class="filter-bar" id="filter-bar-root">
     <div class="filter-bar-header">
