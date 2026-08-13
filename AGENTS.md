@@ -38,20 +38,22 @@ submissions/<publisher>/<run-id>/
   ↓  CI publish job: signature gate → attest site/ → deploy to GitHub Pages
 ```
 
-Validation is structural only. Full Sigstore/Rekor verification of `signature.sigstore.json` is deferred to a future CI step using the Sigstore tooling once the submitting workflow is stable.
+Validation is structural only. CI runs an advisory (`continue-on-error`) `cosign verify-blob` step; full Sigstore/Rekor verification as a hard gate is deferred until upstream `Rethunk-AI/bakeoff` emits real Sigstore bundles (see issue #23).
 
 ## CI jobs
 
 **`verify`** — runs on every push and PR:
+
 - Python compile check
 - Unit tests
 - `validate --scan --allow-empty submissions` (unsigned bundles accepted)
 - `build_index` (rebuilds `site/`)
 
 **`publish`** — runs on `main` pushes only, after `verify`, under the protected `github-pages` environment:
-- `validate --scan --allow-empty --require-signature submissions` (unsigned bundles rejected)
+
+- `validate --scan --allow-empty submissions` — `--require-signature` is supported by the validator but not yet wired here, because no submission carries a signature
 - `build_index`
-- `actions/attest-build-provenance@v2` on `site/index.json` + `site/index.html`
+- `actions/attest-build-provenance@v4` on `site/index.json` + `site/index.html`
 - GitHub Pages deploy from `site/`
 
 ## Key invariants
