@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -30,7 +31,7 @@ def make_bundle(
     bundle = root / "publisher" / "run-001"
     bundle.mkdir(parents=True)
 
-    result = {
+    result: dict[str, Any] = {
         "run_id": "run-001",
         "timestamp": "2026-04-26T00:00:00Z",
         "judge": {"mode": "static-fixture"},
@@ -46,7 +47,9 @@ def make_bundle(
         result.update(extra_result)
 
     write_json(bundle / "result.json", result)
-    (bundle / "summary.md").write_text("# Summary\n\nFixture result.\n", encoding="utf-8")
+    (bundle / "summary.md").write_text(
+        "# Summary\n\nFixture result.\n", encoding="utf-8"
+    )
     write_json(
         bundle / "signature.sigstore.json",
         {"verificationMaterial": {"transparencyLogEntries": [{"logIndex": 1}]}},
@@ -115,7 +118,9 @@ def make_bakeoff_bundle(root: Path) -> Path:
         "judgements": [],
     }
     write_json(bundle / "result.json", result)
-    (bundle / "summary.md").write_text("# Summary\n\nFixture result.\n", encoding="utf-8")
+    (bundle / "summary.md").write_text(
+        "# Summary\n\nFixture result.\n", encoding="utf-8"
+    )
     (bundle / "dashboard.html").write_text("<h1>Fixture</h1>\n", encoding="utf-8")
 
     manifest = {
@@ -234,7 +239,9 @@ def make_post23_bundle(root: Path) -> Path:
         "judgements": [],
     }
     write_json(bundle / "result.json", result)
-    (bundle / "summary.md").write_text("# Summary\n\nFixture multi-model result.\n", encoding="utf-8")
+    (bundle / "summary.md").write_text(
+        "# Summary\n\nFixture multi-model result.\n", encoding="utf-8"
+    )
     (bundle / "dashboard.html").write_text("<h1>Fixture</h1>\n", encoding="utf-8")
 
     manifest = {
@@ -247,12 +254,27 @@ def make_post23_bundle(root: Path) -> Path:
         "model_ids": ["m_a", "m_b", "m_c"],
         "run_status": "failed",
         "model_scores_summary": [
-            {"model_id": "m_a", "status": "complete", "partial_score": 0.8,
-             "floor_score": 1.0, "dominant_failure_code": None},
-            {"model_id": "m_b", "status": "incomplete", "partial_score": 0.5,
-             "floor_score": 0.67, "dominant_failure_code": "timeout"},
-            {"model_id": "m_c", "status": "failed", "partial_score": 0.0,
-             "floor_score": None, "dominant_failure_code": "load_failure"},
+            {
+                "model_id": "m_a",
+                "status": "complete",
+                "partial_score": 0.8,
+                "floor_score": 1.0,
+                "dominant_failure_code": None,
+            },
+            {
+                "model_id": "m_b",
+                "status": "incomplete",
+                "partial_score": 0.5,
+                "floor_score": 0.67,
+                "dominant_failure_code": "timeout",
+            },
+            {
+                "model_id": "m_c",
+                "status": "failed",
+                "partial_score": 0.0,
+                "floor_score": None,
+                "dominant_failure_code": "load_failure",
+            },
         ],
         "files": {
             "result.json": {"sha256": digest(bundle / "result.json")},
@@ -498,15 +520,24 @@ class IndexBuilderTests(unittest.TestCase):
                 "model_metadata": [{"id": "m_x", "gguf": "org/repo/model-x.gguf"}],
                 "tasks": [{"id": "t1", "domain": "qa", "user_prompt": "Q?"}],
                 "records": [
-                    {"task_id": "t1", "prompt_id": "plain", "model_id": "m_x",
-                     "text": "A", "wall_clock_seconds": 1.0,
-                     "failure_code": "timeout", "failure_detail": "exceeded 60s", "error": "timeout"}
+                    {
+                        "task_id": "t1",
+                        "prompt_id": "plain",
+                        "model_id": "m_x",
+                        "text": "A",
+                        "wall_clock_seconds": 1.0,
+                        "failure_code": "timeout",
+                        "failure_detail": "exceeded 60s",
+                        "error": "timeout",
+                    }
                 ],
                 "judgements": [],
                 # No model_scores key — manifest_fallback path
             }
             write_json(bundle / "result.json", result)
-            (bundle / "summary.md").write_text("# Summary\n\nFallback.\n", encoding="utf-8")
+            (bundle / "summary.md").write_text(
+                "# Summary\n\nFallback.\n", encoding="utf-8"
+            )
 
             manifest = {
                 "schema_version": "bakeoff-results/v1",
@@ -518,9 +549,13 @@ class IndexBuilderTests(unittest.TestCase):
                 "model_ids": ["m_x"],
                 "run_status": "incomplete",
                 "model_scores_summary": [
-                    {"model_id": "m_x", "status": "incomplete",
-                     "partial_score": 0.3, "floor_score": None,
-                     "dominant_failure_code": "timeout"},
+                    {
+                        "model_id": "m_x",
+                        "status": "incomplete",
+                        "partial_score": 0.3,
+                        "floor_score": None,
+                        "dominant_failure_code": "timeout",
+                    },
                 ],
                 "files": {
                     "result.json": {"sha256": digest(bundle / "result.json")},
@@ -543,7 +578,9 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertEqual(entry["failure_reason"], "timeout")
             # model_scores_detail populated from manifest fallback
             self.assertEqual(len(entry["model_scores_detail"]), 1)
-            self.assertEqual(entry["model_scores_detail"][0]["dominant_failure_code"], "timeout")
+            self.assertEqual(
+                entry["model_scores_detail"][0]["dominant_failure_code"], "timeout"
+            )
 
 
 if __name__ == "__main__":

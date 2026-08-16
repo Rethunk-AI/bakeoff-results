@@ -108,7 +108,7 @@ def _params_active(result: dict[str, Any]) -> str:
                 p = m.get("active_parameters") or m.get("active_params")
                 if isinstance(p, str) and p:
                     return p
-    return None
+    return "unknown"
 
 
 def _context_length(result: dict[str, Any]) -> str:
