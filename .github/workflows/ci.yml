@@ -16,6 +16,10 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
     permissions:
       contents: read
 
@@ -46,7 +50,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Compile Python
         run: python -m compileall src tests
@@ -151,7 +155,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Validate submissions
         run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
