@@ -22,7 +22,7 @@ where = ["src"]
 # ended up type-checked by mypy while every other Python project in the fleet
 # uses pyrefly.
 [dependency-groups]
-dev = ["pytest>=8.2", "ruff>=0.5", "pyrefly>=0.1"]
+dev = ["pytest>=8.2", "ruff>=0.5", "pyrefly>=0.1", "deptry>=0.20"]
 
 [tool.pyrefly]
 project-includes = ["src", "tests"]
@@ -31,3 +31,6 @@ search-path = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.deptry]
+known_first_party = ["bakeoff_results"]

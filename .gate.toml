@@ -1,0 +1,2 @@
+[gates.deps]
+run = "uv run deptry ."
