@@ -7,7 +7,8 @@ import html
 import json
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -362,12 +363,12 @@ def build_index(submissions_dir: Path | str, site_dir: Path | str) -> dict[str, 
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         git_hash = ""
 
     payload = {
         "schema_version": SCHEMA_VERSION,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_hash": git_hash,
         "entries": entries,
     }
@@ -497,7 +498,7 @@ def _params_snap_points(entries: list[dict[str, Any]]) -> list[int]:
 
     stops: set[int] = {0}
     stops.update(vals)
-    for a, b in zip(vals, vals[1:]):
+    for a, b in pairwise(vals):
         mid = (a + b) // 2
         if a < mid < b:
             stops.add(mid)

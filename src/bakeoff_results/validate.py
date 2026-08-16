@@ -12,9 +12,10 @@ import hashlib
 import json
 import re
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 SCHEMA_VERSION = "bakeoff-results/v1"
 REQUIRED_BUNDLE_FILES = ("result.json", "manifest.json", "summary.md")
