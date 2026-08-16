@@ -16,3 +16,14 @@ bakeoff-results-build-index = "bakeoff_results.build_index:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Declared rather than inferred. With nothing here, the checks resolved to
+# whatever happened to be installed on the machine -- which is how this repo
+# ended up type-checked by mypy while every other Python project in the fleet
+# uses pyrefly.
+[dependency-groups]
+dev = ["pytest>=8.2", "ruff>=0.5", "pyrefly>=0.1"]
+
+[tool.pyrefly]
+project-includes = ["src", "tests"]
+search-path = ["src"]
