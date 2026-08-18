@@ -174,9 +174,7 @@ def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None
         for field in ("identity", "subject", "repository")
     )
     if not has_identity:
-        raise BundleValidationError(
-            "manifest signer requires identity, subject, or repository"
-        )
+        raise BundleValidationError("manifest signer requires identity, subject, or repository")
 
     issuer = signer.get("issuer")
     if issuer is not None and (not isinstance(issuer, str) or not issuer.strip()):
@@ -190,8 +188,7 @@ def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None
     if signature_path.exists():
         signature = load_json(signature_path)
         has_rekor_evidence = any(
-            key in signature
-            for key in ("rekor", "transparencyLogEntries", "verificationMaterial")
+            key in signature for key in ("rekor", "transparencyLogEntries", "verificationMaterial")
         )
         if not has_rekor_evidence:
             raise BundleValidationError(
@@ -210,9 +207,7 @@ def validate_bundle(bundle_dir: Path | str) -> ValidatedBundle:
 
     manifest = load_json(bundle_path / "manifest.json")
     if _schema_version(manifest) != SCHEMA_VERSION:
-        raise BundleValidationError(
-            f"manifest schema_version must be {SCHEMA_VERSION!r}"
-        )
+        raise BundleValidationError(f"manifest schema_version must be {SCHEMA_VERSION!r}")
 
     manifest_hashes = _manifest_file_hashes(manifest)
     files_requiring_hash = [
@@ -223,9 +218,7 @@ def validate_bundle(bundle_dir: Path | str) -> ValidatedBundle:
     for relative_path in files_requiring_hash:
         expected = manifest_hashes.get(relative_path)
         if expected is None:
-            raise BundleValidationError(
-                f"manifest missing sha256 for bundle file: {relative_path}"
-            )
+            raise BundleValidationError(f"manifest missing sha256 for bundle file: {relative_path}")
         if not HEX_SHA256.fullmatch(expected):
             raise BundleValidationError(f"sha256 for {relative_path} is not valid hex")
         actual = sha256_file(bundle_path / relative_path)
@@ -256,9 +249,7 @@ def validate_bundle(bundle_dir: Path | str) -> ValidatedBundle:
         if bundle_info.get("run_id") not in (None, result.get("run_id")):
             raise BundleValidationError("manifest bundle.run_id does not match result.run_id")
         if bundle_info.get("timestamp") not in (None, result.get("timestamp")):
-            raise BundleValidationError(
-                "manifest bundle.timestamp does not match result.timestamp"
-            )
+            raise BundleValidationError("manifest bundle.timestamp does not match result.timestamp")
 
     validate_signer_metadata(manifest, bundle_path)
     return ValidatedBundle(path=bundle_path, manifest=manifest, result=result)

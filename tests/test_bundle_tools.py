@@ -47,9 +47,7 @@ def make_bundle(
         result.update(extra_result)
 
     write_json(bundle / "result.json", result)
-    (bundle / "summary.md").write_text(
-        "# Summary\n\nFixture result.\n", encoding="utf-8"
-    )
+    (bundle / "summary.md").write_text("# Summary\n\nFixture result.\n", encoding="utf-8")
     write_json(
         bundle / "signature.sigstore.json",
         {"verificationMaterial": {"transparencyLogEntries": [{"logIndex": 1}]}},
@@ -70,9 +68,7 @@ def make_bundle(
         "files": {
             "result.json": {"sha256": digest(bundle / "result.json")},
             "summary.md": {"sha256": digest(bundle / "summary.md")},
-            "signature.sigstore.json": {
-                "sha256": digest(bundle / "signature.sigstore.json")
-            },
+            "signature.sigstore.json": {"sha256": digest(bundle / "signature.sigstore.json")},
         },
     }
     write_json(bundle / "manifest.json", manifest)
@@ -118,9 +114,7 @@ def make_bakeoff_bundle(root: Path) -> Path:
         "judgements": [],
     }
     write_json(bundle / "result.json", result)
-    (bundle / "summary.md").write_text(
-        "# Summary\n\nFixture result.\n", encoding="utf-8"
-    )
+    (bundle / "summary.md").write_text("# Summary\n\nFixture result.\n", encoding="utf-8")
     (bundle / "dashboard.html").write_text("<h1>Fixture</h1>\n", encoding="utf-8")
 
     manifest = {
@@ -535,9 +529,7 @@ class IndexBuilderTests(unittest.TestCase):
                 # No model_scores key — manifest_fallback path
             }
             write_json(bundle / "result.json", result)
-            (bundle / "summary.md").write_text(
-                "# Summary\n\nFallback.\n", encoding="utf-8"
-            )
+            (bundle / "summary.md").write_text("# Summary\n\nFallback.\n", encoding="utf-8")
 
             manifest = {
                 "schema_version": "bakeoff-results/v1",
@@ -578,9 +570,7 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertEqual(entry["failure_reason"], "timeout")
             # model_scores_detail populated from manifest fallback
             self.assertEqual(len(entry["model_scores_detail"]), 1)
-            self.assertEqual(
-                entry["model_scores_detail"][0]["dominant_failure_code"], "timeout"
-            )
+            self.assertEqual(entry["model_scores_detail"][0]["dominant_failure_code"], "timeout")
 
 
 if __name__ == "__main__":
