@@ -158,29 +158,29 @@ def _hardware(result: dict[str, Any]) -> dict[str, Any] | str:
 
 # Result states recognized for badge rendering. The first three are the
 # governance-defined states (GOVERNANCE.md); `incomplete`/`failed` extend them
-# so non-finishing runs are first-class rather than invisible (refs #9, #21).
+# so non-finishing runs are first-class rather than invisible.
 VALID_STATES = ("superseded", "disputed", "revoked", "incomplete", "failed")
 
 
 def _state(result: dict[str, Any], manifest: dict[str, Any]) -> str | None:
     """Result state for badge rendering.
 
-    Reading priority (bakeoff#23 schema → legacy back-compat):
+    Reading priority (harness run_status schema, then legacy back-compat):
     1. ``run_status`` in result (harness-emitted worst-of aggregate; values
        "complete"/"incomplete"/"failed"). "complete" is not in VALID_STATES so
        it yields no badge — complete runs render cleanly without clutter.
     2. ``run_status`` in manifest (summary field written by publish.py).
-    3. Legacy ``state`` field in result or manifest (pre-#23 bundles).
+    3. Legacy ``state`` field in result or manifest (legacy bundles without run_status).
 
     Returns a recognized lowercase state, or None when absent/unrecognized so
     accepted runs render no badge (graceful degradation — bundles without the
     new fields continue to render cleanly)."""
-    # Priority 1 & 2: bakeoff#23 run_status (harness-emitted, worst-of aggregate)
+    # Priority 1 & 2: run_status from harness (worst-of aggregate)
     for source in (result, manifest):
         value = source.get("run_status")
         if isinstance(value, str) and value.strip().lower() in VALID_STATES:
             return value.strip().lower()
-    # Priority 3: legacy state field (pre-#23 bundles and hand-authored fixtures)
+    # Priority 3: legacy state field (bundles without run_status and hand-authored fixtures)
     for source in (result, manifest):
         value = source.get("state")
         if isinstance(value, str) and value.strip().lower() in VALID_STATES:
@@ -196,10 +196,8 @@ def _outcome(result: dict[str, Any]) -> str | None:
     return None
 
 
-def _model_scores_list(
-    result: dict[str, Any], manifest: dict[str, Any]
-) -> list[dict[str, Any]]:
-    """Return per-model score entries from the bakeoff#23 schema.
+def _model_scores_list(result: dict[str, Any], manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return per-model score entries from the current bundle schema.
 
     Reads ``model_scores`` from result.json (canonical, full) first; falls back
     to ``model_scores_summary`` from manifest.json (written by publish.py as a
@@ -213,18 +211,16 @@ def _model_scores_list(
     return [entry for entry in raw if isinstance(entry, dict)]
 
 
-def _failure_reason(
-    result: dict[str, Any], manifest: dict[str, Any] | None = None
-) -> str | None:
+def _failure_reason(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> str | None:
     """Why/how a run did not complete, when present.
 
-    Reading priority (bakeoff#23 schema → legacy back-compat):
+    Reading priority (model_scores schema, then legacy back-compat):
     1. ``dominant_failure_code`` from the worst-status model in model_scores
        (synthesized display string, e.g. "timeout" or "oom").
     2. Legacy top-level ``failure_reason``, ``failure``, or ``error`` fields.
 
     None when no failure information is present."""
-    # Priority 1: synthesize from per-model scores (bakeoff#23 schema)
+    # Priority 1: synthesize from per-model scores
     scores = _model_scores_list(result, manifest or {})
     if scores:
         # Pick the worst-status model's dominant_failure_code as the run summary.
@@ -234,7 +230,7 @@ def _failure_reason(
         code = worst.get("dominant_failure_code")
         if isinstance(code, str) and code.strip():
             return code.strip()
-    # Priority 2: legacy top-level fields (pre-#23 bundles)
+    # Priority 2: legacy top-level fields (legacy bundles)
     for key in ("failure_reason", "failure", "error"):
         value = result.get(key)
         if isinstance(value, str) and value.strip():
@@ -242,12 +238,10 @@ def _failure_reason(
     return None
 
 
-def _score(
-    result: dict[str, Any], manifest: dict[str, Any] | None = None
-) -> str | None:
-    """Relative/partial score so weak or non-finishing runs still rank (#9, #27).
+def _score(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> str | None:
+    """Relative/partial score so weak or non-finishing runs still rank.
 
-    Reading priority (bakeoff#23 schema → legacy back-compat):
+    Reading priority (model_scores partial_score, then legacy back-compat):
     1. Mean ``partial_score`` across model_scores entries whose status is not
        "complete" (incomplete qualifier: rendered as e.g. "0.42 (incomplete)").
        For fully-complete runs model_scores exists but no entry is incomplete,
@@ -256,12 +250,10 @@ def _score(
     2. Legacy top-level ``score`` or ``partial_score`` as number or string.
 
     None when absent."""
-    # Priority 1: bakeoff#23 model_scores partial scores
+    # Priority 1: model_scores partial scores
     scores = _model_scores_list(result, manifest or {})
     if scores:
-        non_complete = [
-            s for s in scores if str(s.get("status") or "") in ("incomplete", "failed")
-        ]
+        non_complete = [s for s in scores if str(s.get("status") or "") in ("incomplete", "failed")]
         if non_complete:
             vals = [
                 float(s["partial_score"])
@@ -272,7 +264,7 @@ def _score(
             if vals:
                 mean_score = sum(vals) / len(vals)
                 return f"{mean_score:.2g}"
-    # Priority 2: legacy top-level fields (pre-#23 bundles and hand-authored fixtures)
+    # Priority 2: legacy top-level fields (legacy bundles and hand-authored fixtures)
     for key in ("score", "partial_score"):
         value = result.get(key)
         if isinstance(value, bool):
@@ -284,10 +276,8 @@ def _score(
     return None
 
 
-def _model_scores_detail(
-    result: dict[str, Any], manifest: dict[str, Any]
-) -> list[dict[str, Any]]:
-    """Return per-model display rows for the actions-menu detail (bakeoff#27).
+def _model_scores_detail(result: dict[str, Any], manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return per-model display rows for the actions menu detail.
 
     Each entry: {model_id, status, partial_score, dominant_failure_code}.
     Empty list when no model_scores data is present (back-compat — older bundles
@@ -306,7 +296,7 @@ def _model_scores_detail(
 
 def _cohort(entry: dict[str, Any]) -> str:
     """Comparability signature: only runs sharing judge mode + config hash are
-    directly rank-comparable (#22). Empty when neither is known."""
+    directly rank-comparable. Empty when neither is known."""
     parts = [
         str(entry.get("judge_mode") or "").strip(),
         str(entry.get("config_hash") or "").strip(),
@@ -540,7 +530,7 @@ def render_html(payload: dict[str, Any]) -> str:
         #              5=Model Family, 6=Architecture, 7=Params(total), 8=Params(active),
         #              9=Context Len, 10=Quantization, 11=Similar Results (hidden), 12=Hardware
         # Run ID cell (col 0) carries inline state + score badges so non-finishing
-        # and graded runs are visible WITHOUT adding table columns (refs #9, #21).
+        # and graded runs are visible without adding table columns.
         badges = ""
         if state:
             badges += (
@@ -549,8 +539,7 @@ def render_html(payload: dict[str, Any]) -> str:
             )
         if score:
             badges += (
-                f'<span class="score-badge" title="Relative score">'
-                f"{html.escape(str(score))}</span>"
+                f'<span class="score-badge" title="Relative score">{html.escape(str(score))}</span>'
             )
         run_id_cell = f"<td>{badges}{html.escape(str(entry.get('run_id') or ''))}</td>"
         plain_cells = [
@@ -570,9 +559,7 @@ def render_html(payload: dict[str, Any]) -> str:
         )
         # Similar Results column (hidden by default — JS will populate badge content)
         cells_html += '<td class="similar-results-col" style="display:none"></td>'
-        cells_html += (
-            f"<td class='hw-col-td' style='display:none'>{_hw_cell_html(hw)}</td>"
-        )
+        cells_html += f"<td class='hw-col-td' style='display:none'>{_hw_cell_html(hw)}</td>"
 
         # Per-row Actions menu (⋮): config hash copy + failure/score detail when present
         cfg_escaped = html.escape(config_hash, quote=True)
@@ -582,11 +569,11 @@ def render_html(payload: dict[str, Any]) -> str:
                 f'<button class="actions-menu-item" data-copy="{cfg_escaped}">'
                 f"Copy config hash</button>"
             )
-        # Per-model score/failure detail (bakeoff#27 / bakeoff#23 schema).
+        # Per-model score/failure detail from model_scores_detail.
         # model_scores_detail is a list of {model_id, status, partial_score,
         # dominant_failure_code}. Each non-complete model gets one detail row
         # showing its partial score + failure code. Back-compat: list is empty
-        # for pre-#23 bundles so nothing extra renders.
+        # for legacy bundles so nothing extra renders.
         model_detail = entry.get("model_scores_detail") or []
         for ms in model_detail:
             ms_mid = str(ms.get("model_id") or "")
@@ -645,9 +632,7 @@ def render_html(payload: dict[str, Any]) -> str:
             "cohort": cohort,
         }
         str_data = {k: str(v) for k, v in data.items()}
-        attrs = " ".join(
-            f'data-{k}="{html.escape(v, quote=True)}"' for k, v in str_data.items()
-        )
+        attrs = " ".join(f'data-{k}="{html.escape(v, quote=True)}"' for k, v in str_data.items())
         rows.append(f"<tr class='data-row' {attrs}>{cells_html}{actions_cell}</tr>")
 
     generated_at = html.escape(str(payload["generated_at"]))
