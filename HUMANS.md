@@ -2,9 +2,17 @@
 
 Authoritative guide for running and operating this repository.
 
+## Quick start
+
+Scan all staged bundles (stdlib only — no install required):
+
+```sh
+PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
+```
+
 ## Requirements
 
-Python 3.11 or later. No runtime dependencies outside the standard library.
+Python 3.12 or later. No runtime dependencies outside the standard library.
 
 ## Validate submissions
 
