@@ -1,64 +1,33 @@
 # Agents — bakeoff-results
 
-LLM/developer onboarding for the bakeoff-results repository.
-
 ## File layout
 
 ```
-submissions/              staged bundles — <publisher>/<run-id>/
-site/                     generated static artifacts
-  index.json              machine-readable leaderboard
-  index.html              human-readable leaderboard
+submissions/<publisher>/<run-id>/   staged bundles
+site/                               generated index.json + index.html
 src/bakeoff_results/
-  validate.py             bundle validator (structural + integrity only)
-  build_index.py          static index generator
-  __init__.py
-tests/
-  test_bundle_tools.py    unit tests for validator and index builder
-signers.yaml              approved signer allowlist (bakeoff-results-signers/v1)
-signers.example.yaml      reference shape for the allowlist schema
-GOVERNANCE.md             result states, moderation policy, signer policy narrative
-.github/workflows/ci.yml  CI: verify + publish jobs
+  validate.py                       bundle validator
+  build_index.py                    index generator
+tests/test_bundle_tools.py
+signers.yaml                        signer allowlist (bakeoff-results-signers/v1)
+signers.example.yaml
+GOVERNANCE.md
+.github/workflows/ci.yml
 ```
 
-## Schema
+## Stack
 
-Two schema versions are in use:
+Python 3.12+, stdlib only. Schemas: `bakeoff-results/v1` (bundle manifests), `bakeoff-results-signers/v1` (signers.yaml).
 
-- **`bakeoff-results/v1`** — `manifest.json` inside every bundle. Records file hashes, signer metadata, and run identity.
-- **`bakeoff-results-signers/v1`** — `signers.yaml`. Lists trusted OIDC subjects and identities allowed to submit bundles.
+## CI
 
-## Submission lifecycle
+**verify** (every push/PR): compile, unit tests, `validate --scan --allow-empty`, `build_index`.
 
-```
-submissions/<publisher>/<run-id>/
-  ↓  validate.py: schema check + SHA256 integrity + signer metadata structure
-  ↓  build_index.py: extracts run_id, timestamp, signer, models, judge_mode, config_hash
-  ↓  site/index.json + site/index.html rebuilt
-  ↓  CI publish job: signature gate → attest site/ → deploy to GitHub Pages
-```
+**publish** (`main` only, after verify, `github-pages` env): validate, build_index, attest `site/`, deploy Pages.
 
-Validation is structural only. CI runs an advisory (`continue-on-error`) `cosign verify-blob` step; full Sigstore/Rekor verification as a hard gate waits on upstream `Rethunk-AI/bakeoff` emitting signed bundles.
+## Invariants
 
-## CI jobs
-
-**`verify`** — runs on every push and PR:
-
-- Python compile check
-- Unit tests
-- `validate --scan --allow-empty submissions` (unsigned bundles accepted)
-- `build_index` (rebuilds `site/`)
-
-**`publish`** — runs on `main` pushes only, after `verify`, under the protected `github-pages` environment:
-
-- `validate --scan --allow-empty submissions` — `--require-signature` is supported by the validator but not yet wired here, because no submission carries a signature
-- `build_index`
-- `actions/attest-build-provenance@v4` on `site/index.json` + `site/index.html`
-- GitHub Pages deploy from `site/`
-
-## Key invariants
-
-- `manifest.json` SHA256 entries must match actual file contents — the validator enforces this; never edit bundle files after the manifest is written.
-- `signers.yaml` is the live policy; `signers.example.yaml` documents the schema shape. The validator reads neither — policy enforcement is a future CI step.
-- `site/` is generated; do not hand-edit it. Rebuild via `build_index.py`.
-- The `publish` job requires the `github-pages` environment to be configured with a required reviewer in repository settings.
+- Manifest SHA256 entries must match file contents — never edit bundle files after manifest is written.
+- `signers.yaml` is live policy; validator does not read it yet.
+- `site/` is generated — rebuild via `build_index.py`, do not hand-edit.
+- `publish` requires `github-pages` environment with a required reviewer.
