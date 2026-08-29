@@ -142,7 +142,7 @@ def make_bakeoff_bundle(root: Path) -> Path:
 
 
 def make_post23_bundle(root: Path) -> Path:
-    """Fixture for a bakeoff#23-schema bundle: multi-model, mixed status.
+    """Fixture for a multi-model bundle with mixed run_status values.
 
     Three models: one complete, one incomplete (timeout), one failed (load_failure).
     run_status = "failed" (worst-of aggregate). Tests the display wiring for
@@ -381,11 +381,11 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertIn("timeout after 600s", html)
             self.assertIn('id="f-state"', html)
             self.assertNotIn('id="f-cohort"', html)
-            # Column count unchanged — no Column Count Mismatch (cf. closed #20)
+            # Column count unchanged — thirteen data columns in the table header row.
             self.assertEqual(html.count('data-col-index="'), 13)
 
     def test_no_state_renders_no_badge(self) -> None:
-        # Graceful degradation: bundles without the new fields render cleanly.
+        # Graceful degradation: bundles without run_status render cleanly.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             make_bundle(root / "submissions")
@@ -400,7 +400,7 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertNotIn("state-badge state-", html)
 
     def test_bakeoff23_run_status_wired_to_state_badge(self) -> None:
-        # bakeoff#23 schema: run_status → state badge (not the legacy `state` field).
+        # run_status maps to the state badge; top-level state is not read when run_status is set.
         # A multi-model run with mixed statuses: worst-of is "failed".
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
