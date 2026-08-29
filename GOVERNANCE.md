@@ -36,8 +36,7 @@ that runs which did not finish are recorded rather than hidden:
 
 The leaderboard renders any non-`accepted` state as an inline badge on the run,
 and `incomplete`/`failed` runs may carry a partial score and a failure reason.
-The underlying outcome data is emitted upstream by the bakeoff harness; see the
-downstream contract in `Rethunk-AI/bakeoff#23`.
+The underlying outcome data is emitted upstream by the bakeoff harness; see the run-outcome schema in `Rethunk-AI/bakeoff`.
 
 State changes must be evidence-backed and recorded with the affected run ID,
 reason, reviewer, timestamp, and links to supporting material.

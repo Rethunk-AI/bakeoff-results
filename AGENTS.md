@@ -38,7 +38,7 @@ submissions/<publisher>/<run-id>/
   ↓  CI publish job: signature gate → attest site/ → deploy to GitHub Pages
 ```
 
-Validation is structural only. CI runs an advisory (`continue-on-error`) `cosign verify-blob` step; full Sigstore/Rekor verification as a hard gate is deferred until upstream `Rethunk-AI/bakeoff` emits real Sigstore bundles.
+Validation is structural only. CI runs an advisory (`continue-on-error`) `cosign verify-blob` step; full Sigstore/Rekor verification as a hard gate waits on upstream `Rethunk-AI/bakeoff` emitting signed bundles.
 
 ## CI jobs
 
