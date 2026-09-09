@@ -48,19 +48,19 @@ jobs:
           fi
           echo "INFO: signers.yaml commit is signed"
 
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: Rethunk-Tech/gh-actions/setup-python@5d07bd8adb2dda1caa11cacd886edf73e2e95afb # v1.10
         with:
           python-version: ${{ matrix.python-version }}
+          install-args: --locked
 
       - name: Compile Python
-        run: python -m compileall src tests
+        run: uv run python -m compileall src tests
 
       - name: Run tests
-        run: PYTHONPATH=src python -m unittest discover -s tests
+        run: PYTHONPATH=src uv run python -m unittest discover -s tests
 
       - name: Validate submissions
-        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
+        run: PYTHONPATH=src uv run python -m bakeoff_results.validate --scan --allow-empty submissions
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
@@ -113,7 +113,7 @@ jobs:
           echo "============================================================"
 
       - name: Build static index
-        run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
+        run: PYTHONPATH=src uv run python -m bakeoff_results.build_index --submissions submissions --site site
 
   publish:
     needs: verify
@@ -153,16 +153,16 @@ jobs:
           fi
           echo "INFO: signers.yaml commit is signed"
 
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: Rethunk-Tech/gh-actions/setup-python@5d07bd8adb2dda1caa11cacd886edf73e2e95afb # v1.10
         with:
           python-version: "3.14"
+          install-args: --locked
 
       - name: Validate submissions
-        run: PYTHONPATH=src python -m bakeoff_results.validate --scan --allow-empty submissions
+        run: PYTHONPATH=src uv run python -m bakeoff_results.validate --scan --allow-empty submissions
 
       - name: Build static index
-        run: PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions --site site
+        run: PYTHONPATH=src uv run python -m bakeoff_results.build_index --submissions submissions --site site
 
       - name: Attest site artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
