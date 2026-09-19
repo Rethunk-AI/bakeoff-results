@@ -294,16 +294,6 @@ def _model_scores_detail(result: dict[str, Any], manifest: dict[str, Any]) -> li
     ]
 
 
-def _cohort(entry: dict[str, Any]) -> str:
-    """Comparability signature: only runs sharing judge mode + config hash are
-    directly rank-comparable. Empty when neither is known."""
-    parts = [
-        str(entry.get("judge_mode") or "").strip(),
-        str(entry.get("config_hash") or "").strip(),
-    ]
-    return "|".join(p for p in parts if p)
-
-
 def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
     result = bundle.result
     entry = {
@@ -332,7 +322,6 @@ def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
         "model_scores_detail": _model_scores_detail(result, bundle.manifest),
         "bundle_path": bundle.path.as_posix(),
     }
-    entry["cohort"] = _cohort(entry)
     return entry
 
 
@@ -523,8 +512,6 @@ def render_html(payload: dict[str, Any]) -> str:
         state = entry.get("state") or ""
         score = entry.get("score") or ""
         failure_reason = entry.get("failure_reason") or ""
-        cohort = entry.get("cohort") or ""
-
         # Columns (no config_hash in main columns — moved to row detail)
         # Col indices: 0=Run ID, 1=Timestamp, 2=Signer, 3=Models, 4=Judge Mode,
         #              5=Model Family, 6=Architecture, 7=Params(total), 8=Params(active),
@@ -629,7 +616,6 @@ def render_html(payload: dict[str, Any]) -> str:
             "config_hash": config_hash,
             "state": state,
             "score": score,
-            "cohort": cohort,
         }
         str_data = {k: str(v) for k, v in data.items()}
         attrs = " ".join(f'data-{k}="{html.escape(v, quote=True)}"' for k, v in str_data.items())
