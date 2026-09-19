@@ -372,8 +372,7 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertEqual(entry["state"], "incomplete")
             self.assertEqual(entry["score"], "0.42")
             self.assertEqual(entry["failure_reason"], "timeout after 600s")
-            # cohort = judge_mode|config_hash
-            self.assertEqual(entry["cohort"], "static-fixture|config-sha256")
+            self.assertNotIn("cohort", entry)
 
             html = (root / "site" / "index.html").read_text(encoding="utf-8")
             self.assertIn("state-incomplete", html)
