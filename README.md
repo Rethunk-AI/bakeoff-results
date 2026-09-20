@@ -26,6 +26,7 @@ Install, build, test, and verify: [HUMANS.md](HUMANS.md).
 
 - **Validated bundles** — structural checks, SHA256 integrity, signer metadata on every submission
 - **Static leaderboard** — `build_index.py` generates `site/index.json` and a filterable HTML explorer
+- **Distributed worker queue** — optional HTTP API for runner registration, job claim, heartbeat, and signed submit; admin dashboard at `/runners`
 - **Signer policy** — `signers.yaml` allowlist; Sigstore/Rekor material when present
 - **Supply-chain posture** — CI verifies bundles, attests site artifacts, deploys under a protected environment
 - **Governed lifecycle** — accepted, superseded, disputed, revoked states ([GOVERNANCE.md](GOVERNANCE.md))

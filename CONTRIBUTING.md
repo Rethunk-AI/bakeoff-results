@@ -13,8 +13,8 @@ that content here.
 
 ## Development setup
 
-No install required. The validator and index builder use stdlib only and run
-via `PYTHONPATH`:
+No install required for the validator and index builder. They use stdlib only and run
+via `PYTHONPATH`. The queue server extra needs `uv sync` (`cryptography`).
 
 ```sh
 git clone https://github.com/Rethunk-AI/bakeoff-results
