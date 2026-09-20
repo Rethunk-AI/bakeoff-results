@@ -8,11 +8,14 @@ version = "0.1.0"
 description = "Validation and static index tooling for private bakeoff result bundles."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "cryptography>=43.0",
+]
 
 [project.scripts]
 bakeoff-results-validate = "bakeoff_results.validate:main"
 bakeoff-results-build-index = "bakeoff_results.build_index:main"
+bakeoff-results-queue = "bakeoff_results.queue_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -28,6 +31,9 @@ search-path = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+"src/bakeoff_results/queue_server.py" = ["N802"]
 
 [tool.deptry]
 known_first_party = ["bakeoff_results"]
