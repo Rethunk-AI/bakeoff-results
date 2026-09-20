@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+- HTTP queue API for distributed workers: register, claim, heartbeat, signed submit, public-key whitelist, and admin key management (closes #31)
+- Runner management dashboard at `/runners` — roster, heartbeats, queue depth, approve/revoke/pause/re-queue (closes #32)
+
 ## 2026-06-03
 
 ### Added

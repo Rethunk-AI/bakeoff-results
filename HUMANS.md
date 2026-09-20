@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Python 3.12+. Stdlib only — set `PYTHONPATH=src` for CLI commands.
+Python 3.12+. Validator and index builder are stdlib-only — set `PYTHONPATH=src` for CLI commands. The optional queue server also needs `cryptography` (`uv sync`).
 
 ## Validate submissions
 
@@ -23,11 +23,38 @@ PYTHONPATH=src python -m bakeoff_results.build_index --submissions submissions -
 
 Outputs `site/index.json` and `site/index.html`.
 
+## Distributed worker queue
+
+Optional HTTP API for `Rethunk-AI/bakeoff` workers (`#31`). Data lives under
+`BAKEOFF_RESULTS_DATA_DIR` (default `~/.local/share/bakeoff-results`).
+
+```sh
+uv sync
+export BAKEOFF_QUEUE_ADMIN_TOKEN=...   # optional; generated into the data dir
+PYTHONPATH=src uv run python -m bakeoff_results.queue_server serve --host 127.0.0.1 --port 8765
+PYTHONPATH=src uv run python -m bakeoff_results.queue_server enqueue --model qwen3.5-9b
+```
+
+Approve a runner's Ed25519 public key (admin bearer token), then the worker can
+`POST /api/runners/register`. Dashboard: http://127.0.0.1:8765/runners
+
+| Method | Path | Who |
+| --- | --- | --- |
+| POST | `/api/runners/register` | whitelisted public key |
+| POST | `/api/queue/claim` | runner token |
+| POST | `/api/queue/<job_id>/heartbeat` | runner token |
+| POST | `/api/queue/<job_id>/submit` | runner token (signed envelope) |
+| POST | `/api/admin/keys` | admin token |
+| GET | `/api/runners`, `/api/queue` | admin token |
+
+Stale claims return to `PENDING` after `BAKEOFF_QUEUE_HEARTBEAT_TTL_S` (default 120).
+
 ## Test
 
 ```sh
+uv sync
 python -m compileall src tests
-PYTHONPATH=src python -m unittest discover -s tests
+PYTHONPATH=src uv run python -m unittest discover -s tests
 ```
 
 ## Verify published site
@@ -43,4 +70,4 @@ gh attestation verify site/index.html --repo Rethunk-AI/bakeoff-results
 
 ## Uninstall
 
-No packages are installed. Delete the clone when finished.
+Validator and index builder need no install. If you `uv sync` for the queue server, delete `.venv` and the clone.
