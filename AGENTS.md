@@ -40,3 +40,4 @@ Python 3.12+. Validator and index builder stay stdlib-only. The queue server add
 - Claim is rename-as-mutex on JSON files under `BAKEOFF_RESULTS_DATA_DIR`; do not add a SQL runtime to this package.
 - Queue submit verifies the bakeoff Ed25519 envelope against the registered public key, then `validate_result`.
 - Registration is gated by the public-key whitelist. OAuth is out of scope.
+- `PAUSED` runners must not claim; `IDLE` runners may. Pause does not drop an in-flight claim.

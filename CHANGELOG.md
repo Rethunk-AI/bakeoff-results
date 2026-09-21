@@ -3,12 +3,15 @@
 ## Unreleased
 
 ### Added
+
 - HTTP queue API for distributed workers: register, claim, heartbeat, signed submit, public-key whitelist, and admin key management (closes #31)
 - Runner management dashboard at `/runners` — roster, heartbeats, queue depth, approve/revoke/pause/re-queue (closes #32)
+- Pause on `/runners` sets `PAUSED` (blocks new claims, keeps the current job); workers can `POST /api/queue/<id>/fail` to nack with an error that retries then marks `FAILED`
 
 ## 2026-06-03
 
 ### Added
+
 - Inline result-state and partial-score badges on leaderboard entries; failure reason surfaced in the actions menu; state and cohort filters added (closes #24, refs #9, #21)
 - Multi-select filters, column visibility toggle, and column sort (closes #16, #17, #18)
 - VRAM ranges, gear/settings panel, range sliders, Similar Results column, config-hash click-to-copy (closes #10)
@@ -17,6 +20,7 @@
 - `GOVERNANCE.md` documents `incomplete` and `failed` run-outcome states
 
 ### Changed
+
 - Filter-add button repositioned to stable header row; `×` toggle symbol shown when multi-select is active; padding reduced (closes #29)
 - Cohort filter column removed; slider centering and smooth collapse animation applied (refs #22)
 - Filter chevron direction corrected; expand/collapse animation timing, margin, and fade polished
@@ -27,15 +31,18 @@
 ## 2026-04-27
 
 ### Added
+
 - Three-tier doc governance: `HUMANS.md`, `AGENTS.md`, `CLAUDE.md` symlink
 - Repo hygiene: `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS`, PR template, dependabot, issue templates
 
 ### Changed
+
 - `README.md` stripped to orientation + links per Bastion doc-governance tier rules
 
 ## 2026-04-26
 
 ### Added
+
 - `signers.yaml` — approved signer allowlist locked to `Rethunk-AI/bakeoff` main, `package-results.yml`, `github-actions[bot]` OIDC identity
 - `--require-signature` flag on `bakeoff-results-validate` — publish gate rejects unsigned bundles; staging remains permissive
 - CI `publish` job — signature gate, `actions/attest-build-provenance@v2` for `site/index.json` + `site/index.html`, GitHub Pages deploy under protected `github-pages` environment
