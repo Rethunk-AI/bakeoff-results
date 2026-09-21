@@ -38,6 +38,7 @@ STATUS_CANCELLED = "CANCELLED"
 
 RUNNER_ACTIVE = "ACTIVE"
 RUNNER_IDLE = "IDLE"
+RUNNER_PAUSED = "PAUSED"
 RUNNER_DEAD = "DEAD"
 
 _DEFAULT_DATA_DIR = "~/.local/share/bakeoff-results"
@@ -200,14 +201,14 @@ def list_runners(root: Path) -> list[dict[str, Any]]:
 
 
 def set_runner_status(root: Path, runner_id: str, status: str) -> dict[str, Any]:
-    if status not in {RUNNER_ACTIVE, RUNNER_IDLE, RUNNER_DEAD}:
+    if status not in {RUNNER_ACTIVE, RUNNER_IDLE, RUNNER_PAUSED, RUNNER_DEAD}:
         raise QueueStoreError(f"invalid runner status: {status}")
     runner = get_runner(root, runner_id)
     if runner is None:
         raise QueueStoreError(f"unknown runner: {runner_id}")
     runner["status"] = status
     runner["updated_at"] = utc_now()
-    if status != RUNNER_ACTIVE:
+    if status == RUNNER_DEAD:
         runner["current_claim"] = None
     _atomic_write(_runner_path(root, runner_id), runner)
     return runner
@@ -382,23 +383,26 @@ def complete(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
         src.unlink()
     runner = get_runner(root, runner_id)
     if runner is not None:
-        runner["status"] = RUNNER_IDLE
+        if runner.get("status") != RUNNER_PAUSED:
+            runner["status"] = RUNNER_IDLE
         runner["current_claim"] = None
         runner["last_heartbeat"] = now_str
         _atomic_write(_runner_path(root, runner_id), runner)
     return data
 
 
-def fail(root: Path, job_id: str, error: str) -> dict[str, Any]:
+def fail(root: Path, job_id: str, error: str, runner_id: str | None = None) -> dict[str, Any]:
     found = _lookup_pending(root, job_id)
     if found is None:
         raise QueueStoreError(f"unknown in-flight job: {job_id}")
     src, data = found
+    owner = data.get("claimed_by")
+    if runner_id is not None and owner != runner_id:
+        raise QueueStoreError("job is not claimed by this runner")
     now_str = utc_now()
     attempt = int(data.get("attempt_count", 0))
     max_att = int(data.get("max_attempts", 5))
     data["error_detail"] = error
-    runner_id = data.get("claimed_by")
 
     if attempt < max_att:
         attempt += 1
@@ -422,12 +426,13 @@ def fail(root: Path, job_id: str, error: str) -> dict[str, Any]:
         with contextlib.suppress(FileNotFoundError):
             src.unlink()
 
-    if isinstance(runner_id, str):
-        runner = get_runner(root, runner_id)
+    if isinstance(owner, str):
+        runner = get_runner(root, owner)
         if runner is not None:
-            runner["status"] = RUNNER_IDLE
+            if runner.get("status") != RUNNER_PAUSED:
+                runner["status"] = RUNNER_IDLE
             runner["current_claim"] = None
-            _atomic_write(_runner_path(root, runner_id), runner)
+            _atomic_write(_runner_path(root, owner), runner)
     return data
 
 
