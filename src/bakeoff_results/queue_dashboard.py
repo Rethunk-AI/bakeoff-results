@@ -18,6 +18,7 @@ DASHBOARD_HTML = """<!doctype html>
       text-transform: uppercase; padding: 1px 6px; border-radius: 3px; }
     .ACTIVE { color: #1a7f37; background: #dafbe1; }
     .IDLE { color: #0969da; background: #ddf4ff; }
+    .PAUSED { color: #9a6700; background: #fff8c5; }
     .DEAD { color: #cf222e; background: #ffebe9; }
     .PENDING { color: #9a6700; background: #fff8c5; }
     .CLAIMED, .IN_PROGRESS { color: #0969da; background: #ddf4ff; }
@@ -64,7 +65,7 @@ DASHBOARD_HTML = """<!doctype html>
       <thead>
         <tr>
           <th>Job</th><th>Model</th><th>Status</th><th>Priority</th>
-          <th>Claimed by</th><th></th>
+          <th>Claimed by</th><th>Error</th><th></th>
         </tr>
       </thead>
       <tbody id="jobs"></tbody>
@@ -79,8 +80,14 @@ DASHBOARD_HTML = """<!doctype html>
     function headers() {
       return { "Authorization": "Bearer " + token(), "Content-Type": "application/json" };
     }
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
     function badge(value) {
-      return '<span class="badge ' + value + '">' + value + '</span>';
+      const text = String(value ?? "");
+      return '<span class="badge ' + esc(text) + '">' + esc(text) + '</span>';
     }
     async function api(path, options) {
       const response = await fetch(path, Object.assign({ headers: headers() }, options));
@@ -101,23 +108,26 @@ DASHBOARD_HTML = """<!doctype html>
           "(depth " + queue.depth + ", in flight " + queue.in_flight + ")";
         document.getElementById("runners").innerHTML = runners.runners.map(runner => {
           const caps = runner.capabilities || {};
-          return "<tr><td>" + runner.runner_id + "</td><td>" + badge(runner.status) +
-            "</td><td>" + (runner.hostname || "") + "</td><td>" +
-            (runner.last_heartbeat || "") + "</td><td>" +
-            (runner.current_claim || "") + "</td><td>" +
-            (caps.vram_mb || "") + "</td><td>" +
-            "<button data-runner='" + runner.runner_id + "' data-status='IDLE'>Pause</button> " +
-            "<button data-runner='" + runner.runner_id + "' data-status='ACTIVE'>Resume</button> " +
-            "<button data-key='" + (runner.public_key || "") + "' data-action='remove'>Revoke</button>" +
+          const id = esc(runner.runner_id);
+          return "<tr><td>" + id + "</td><td>" + badge(runner.status) +
+            "</td><td>" + esc(runner.hostname || "") + "</td><td>" +
+            esc(runner.last_heartbeat || "") + "</td><td>" +
+            esc(runner.current_claim || "") + "</td><td>" +
+            esc(caps.vram_mb || "") + "</td><td>" +
+            "<button data-runner='" + id + "' data-status='PAUSED'>Pause</button> " +
+            "<button data-runner='" + id + "' data-status='IDLE'>Resume</button> " +
+            "<button data-key='" + esc(runner.public_key || "") +
+            "' data-action='remove'>Revoke</button>" +
             "</td></tr>";
         }).join("") || "<tr><td colspan=7>No runners registered.</td></tr>";
         document.getElementById("jobs").innerHTML = queue.jobs.map(job => {
           const id = job.queue_id || job.run_id;
-          return "<tr><td>" + id + "</td><td>" + (job.model_id || "") +
-            "</td><td>" + badge(job.status) + "</td><td>" + job.priority +
-            "</td><td>" + (job.claimed_by || "") + "</td><td>" +
-            "<button data-requeue='" + id + "'>Re-queue</button></td></tr>";
-        }).join("") || "<tr><td colspan=6>Queue is empty.</td></tr>";
+          return "<tr><td>" + esc(id) + "</td><td>" + esc(job.model_id || "") +
+            "</td><td>" + badge(job.status) + "</td><td>" + esc(job.priority) +
+            "</td><td>" + esc(job.claimed_by || "") + "</td><td>" +
+            esc(job.error_detail || "") + "</td><td>" +
+            "<button data-requeue='" + esc(id) + "'>Re-queue</button></td></tr>";
+        }).join("") || "<tr><td colspan=7>Queue is empty.</td></tr>";
       } catch (err) {
         statusEl.textContent = err.message;
         statusEl.className = "error";
@@ -126,8 +136,14 @@ DASHBOARD_HTML = """<!doctype html>
     document.getElementById("save").onclick = () => {
       sessionStorage.setItem("bakeoff-admin-token", token());
       refresh();
+      schedule();
     };
     document.getElementById("refresh").onclick = refresh;
+    let timer = null;
+    function schedule() {
+      clearInterval(timer);
+      if (token()) timer = setInterval(refresh, 5000);
+    }
     document.body.addEventListener("click", async (event) => {
       const button = event.target.closest("button");
       if (!button) return;
@@ -154,7 +170,7 @@ DASHBOARD_HTML = """<!doctype html>
         statusEl.className = "error";
       }
     });
-    if (token()) refresh();
+    if (token()) { refresh(); schedule(); }
   </script>
 </body>
 </html>

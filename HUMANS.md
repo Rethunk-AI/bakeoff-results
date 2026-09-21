@@ -36,7 +36,7 @@ PYTHONPATH=src uv run python -m bakeoff_results.queue_server enqueue --model qwe
 ```
 
 Approve a runner's Ed25519 public key (admin bearer token), then the worker can
-`POST /api/runners/register`. Dashboard: http://127.0.0.1:8765/runners
+`POST /api/runners/register`. Dashboard: <http://127.0.0.1:8765/runners>
 
 | Method | Path | Who |
 | --- | --- | --- |
@@ -44,10 +44,14 @@ Approve a runner's Ed25519 public key (admin bearer token), then the worker can
 | POST | `/api/queue/claim` | runner token |
 | POST | `/api/queue/<job_id>/heartbeat` | runner token |
 | POST | `/api/queue/<job_id>/submit` | runner token (signed envelope) |
+| POST | `/api/queue/<job_id>/fail` | runner token (`{"error": "..."}`) |
 | POST | `/api/admin/keys` | admin token |
 | GET | `/api/runners`, `/api/queue` | admin token |
 
 Stale claims return to `PENDING` after `BAKEOFF_QUEUE_HEARTBEAT_TTL_S` (default 120).
+Pause on `/runners` sets `PAUSED` and blocks new claims; the current job stays
+with the runner until it submits, fails, or the heartbeat TTL fires. `POST fail`
+retries with backoff until `max_attempts`, then marks the job `FAILED`.
 
 ## Test
 
