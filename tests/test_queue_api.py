@@ -20,8 +20,11 @@ from bakeoff_results.queue_store import (
     add_whitelist_key,
     claim,
     enqueue,
+    fail,
     list_pending,
     reap_stale_claims,
+    set_runner_status,
+    upsert_runner,
 )
 
 
@@ -90,6 +93,25 @@ class QueueStoreTests(unittest.TestCase):
         reaped = reap_stale_claims(self.root, timeout_seconds=60)
         self.assertEqual(reaped, [claimed["queue_id"]])
         self.assertEqual(list_pending(self.root)[0]["status"], "PENDING")
+
+    def test_pause_keeps_current_claim(self) -> None:
+        upsert_runner(
+            self.root,
+            {"runner_id": "runner-1", "status": "ACTIVE", "current_claim": "job-1"},
+        )
+        paused = set_runner_status(self.root, "runner-1", "PAUSED")
+        self.assertEqual(paused["status"], "PAUSED")
+        self.assertEqual(paused["current_claim"], "job-1")
+
+    def test_fail_retries_then_marks_failed(self) -> None:
+        enqueue(self.root, {"model_id": "qwen", "max_attempts": 1})
+        claimed = claim(self.root, "runner-1")
+        assert claimed is not None
+        retried = fail(self.root, claimed["queue_id"], "oom", "runner-1")
+        self.assertEqual(retried["status"], "PENDING")
+        self.assertEqual(retried["error_detail"], "oom")
+        dead = fail(self.root, claimed["queue_id"], "oom again")
+        self.assertEqual(dead["status"], "FAILED")
 
 
 class QueueApiTests(unittest.TestCase):
@@ -191,6 +213,68 @@ class QueueApiTests(unittest.TestCase):
         self.assertEqual(status, 204)
         self.assertIsNone(body)
 
+    def test_paused_runner_cannot_claim(self) -> None:
+        status, registered = self._dispatch(
+            "POST",
+            "/api/runners/register",
+            {"public_key": self.public, "hostname": "box"},
+        )
+        self.assertEqual(status, 200)
+        assert registered is not None
+        runner_id = registered["runner"]["runner_id"]
+        enqueue(self.root, {"model_id": "qwen", "run_id": "paused-job", "queue_id": "paused-job"})
+        status, _ = self._dispatch(
+            "POST",
+            f"/api/admin/runners/{runner_id}/status",
+            {"status": "PAUSED"},
+            admin=True,
+        )
+        self.assertEqual(status, 200)
+        status, data = self._dispatch(
+            "POST",
+            "/api/queue/claim",
+            {},
+            token=registered["token"],
+        )
+        self.assertEqual(status, 403)
+        assert data is not None
+        self.assertIn("paused", data["error"])
+        status, _ = self._dispatch(
+            "POST",
+            f"/api/admin/runners/{runner_id}/status",
+            {"status": "IDLE"},
+            admin=True,
+        )
+        status, claimed = self._dispatch(
+            "POST",
+            "/api/queue/claim",
+            {},
+            token=registered["token"],
+        )
+        self.assertEqual(status, 200)
+        assert claimed is not None
+        self.assertEqual(claimed["job"]["queue_id"], "paused-job")
+
+    def test_fail_reports_error_and_requeues(self) -> None:
+        status, registered = self._dispatch(
+            "POST",
+            "/api/runners/register",
+            {"public_key": self.public},
+        )
+        assert registered is not None
+        enqueue(self.root, {"model_id": "qwen", "run_id": "fail-job", "queue_id": "fail-job"})
+        self._dispatch("POST", "/api/queue/claim", {}, token=registered["token"])
+        status, data = self._dispatch(
+            "POST",
+            "/api/queue/fail-job/fail",
+            {"error": "cuda oom"},
+            token=registered["token"],
+        )
+        self.assertEqual(status, 200)
+        assert data is not None
+        self.assertEqual(data["job"]["status"], "PENDING")
+        self.assertEqual(data["job"]["error_detail"], "cuda oom")
+
     def test_admin_add_and_remove_key(self) -> None:
         _, extra = generate_keypair()
         status, data = self._dispatch(
@@ -237,6 +321,8 @@ class QueueApiTests(unittest.TestCase):
         response = dispatch(self.settings, "GET", "/runners", {}, b"")
         self.assertEqual(response.status, 200)
         self.assertIn(b"Bakeoff runners", response.body)
+        self.assertIn(b"data-status='PAUSED'", response.body)
+        self.assertIn(b"error_detail", response.body)
 
     def test_http_server_health(self) -> None:
         handler = make_handler(self.settings)

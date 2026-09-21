@@ -17,6 +17,7 @@ from bakeoff_results.queue_store import (
     claim,
     complete,
     enqueue,
+    fail,
     get_runner,
     heartbeat,
     list_completed,
@@ -133,7 +134,7 @@ def dispatch(
         if method == "GET" and route == "/api/queue":
             require_admin(headers, settings.admin_token)
             return _list_queue(settings, parse_qs(parsed.query))
-        match = re.fullmatch(r"/api/queue/([^/]+)/(heartbeat|submit|requeue)", route)
+        match = re.fullmatch(r"/api/queue/([^/]+)/(heartbeat|submit|requeue|fail)", route)
         if match:
             job_id = match.group(1)
             action = match.group(2)
@@ -143,6 +144,8 @@ def dispatch(
                 return _heartbeat(settings, headers, job_id)
             if action == "submit" and method == "POST":
                 return _submit(settings, headers, job_id, _read_json(body))
+            if action == "fail" and method == "POST":
+                return _fail(settings, headers, job_id, _read_json(body))
             if action == "requeue" and method == "POST":
                 require_admin(headers, settings.admin_token)
                 return _json(200, {"job": requeue(settings.data_dir, job_id)})
@@ -234,6 +237,8 @@ def _claim(
         return _error(403, "runner is not registered")
     if runner.get("status") == "DEAD":
         return _error(403, "runner is revoked")
+    if runner.get("status") == "PAUSED":
+        return _error(403, "runner is paused")
     capabilities = payload.get("capabilities")
     stored_caps = runner.get("capabilities")
     if not isinstance(capabilities, dict):
@@ -277,6 +282,19 @@ def _list_queue(settings: QueueSettings, query: dict[str, list[str]]) -> AppResp
 def _heartbeat(settings: QueueSettings, headers: dict[str, str], job_id: str) -> AppResponse:
     runner_id = _require_runner(settings, headers)
     return _json(200, {"job": heartbeat(settings.data_dir, job_id, runner_id)})
+
+
+def _fail(
+    settings: QueueSettings,
+    headers: dict[str, str],
+    job_id: str,
+    payload: dict[str, Any],
+) -> AppResponse:
+    runner_id = _require_runner(settings, headers)
+    error = payload.get("error") or payload.get("error_detail") or "runner reported failure"
+    if not isinstance(error, str) or not error.strip():
+        return _error(400, "error is required")
+    return _json(200, {"job": fail(settings.data_dir, job_id, error.strip(), runner_id)})
 
 
 def _submit(
