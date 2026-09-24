@@ -113,6 +113,15 @@ jobs:
       - name: Build static index
         run: PYTHONPATH=src uv run python -m bakeoff_results.build_index --submissions submissions --site site
 
+      # publish deploys this verified build instead of validating and rebuilding it.
+      - name: Upload site
+        if: matrix.python-version == '3.14'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: site
+          path: site
+          if-no-files-found: error
+
   publish:
     needs: verify
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -128,39 +137,11 @@ jobs:
       pages: write
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Download site
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          fetch-depth: 0
-
-      - name: Verify signers.yaml commit signature
-        run: |
-          # Check if the last commit touching signers.yaml is signed
-          last_commit=$(git log --format=%H -1 -- signers.yaml)
-          if [ -z "$last_commit" ]; then
-            echo "No commits found for signers.yaml; skipping signature check"
-            exit 0
-          fi
-
-          signature=$(git log --format=%B "$last_commit" | grep -i "gpgsig\|ssh")
-          if [ -z "$signature" ]; then
-            echo "WARNING: Last commit to signers.yaml is not GPG/SSH signed"
-            echo "Commit: $last_commit"
-            echo "For production, this should trigger a hard failure."
-            exit 0
-          fi
-          echo "INFO: signers.yaml commit is signed"
-
-      - uses: Rethunk-Tech/gh-actions/setup-python@68f159b435d9b129b8baf36436079c3e76fb3222 # v1.11
-        with:
-          python-version: "3.14"
-          install-args: --locked
-
-      - name: Validate submissions
-        run: PYTHONPATH=src uv run python -m bakeoff_results.validate --scan --allow-empty submissions
-
-      - name: Build static index
-        run: PYTHONPATH=src uv run python -m bakeoff_results.build_index --submissions submissions --site site
+          name: site
+          path: site
 
       - name: Attest site artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
