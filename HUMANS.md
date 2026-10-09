@@ -25,7 +25,7 @@ Outputs `site/index.json` and `site/index.html`.
 
 ## Distributed worker queue
 
-Optional HTTP API for `Rethunk-AI/bakeoff` workers (`#31`). Data lives under
+Optional HTTP API for `Rethunk-AI/bakeoff` workers. Data lives under
 `BAKEOFF_RESULTS_DATA_DIR` (default `~/.local/share/bakeoff-results`).
 
 ```sh
