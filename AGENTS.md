@@ -28,7 +28,7 @@ Python 3.12+. Validator and index builder stay stdlib-only. The queue server add
 
 ## CI
 
-**verify** (every push/PR): compile, unit tests, `validate --scan --allow-empty`, `build_index`.
+**verify** (every push/PR): signers.yaml commit-signature check, compile, unit tests, `validate --scan --allow-empty`, Sigstore bundle verification, `build_index`.
 
 **publish** (`main` only, after verify, `github-pages` env): validate, build_index, attest `site/`, deploy Pages.
 
