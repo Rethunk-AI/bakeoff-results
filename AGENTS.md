@@ -44,4 +44,4 @@ Python 3.12+. Validator and index builder stay stdlib-only. The queue server add
 
 ## Gate budget
 
-Measured 2026-10-09 at load 8-12 on 32 cores: warm `gate --profile` 0.8-1.1 s wall and about 1.2 s CPU; cold (fresh copy, new `.venv`, throwaway uv cache) 2.0 s wall and about 2.4 s CPU. Both are far under the 10 s warm and 30 s cold bar. pytest runs single-process (no xdist, so no `-n auto` oversubscription) and is the slowest step; no step is duplicated between `.gate.toml` and the project. Nothing to trim.
+Budget: 10 s warm, 30 s cold. pytest runs single-process (no xdist, so no `-n auto` oversubscription) and is the slowest step; no step is duplicated between `.gate.toml` and the project.
