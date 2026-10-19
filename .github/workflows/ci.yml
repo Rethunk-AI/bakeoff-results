@@ -48,7 +48,7 @@ jobs:
           fi
           echo "INFO: signers.yaml commit is signed"
 
-      - uses: Rethunk-Tech/gh-actions/setup-python@bc5fa5b1004205c9c9399fc941d79d5ada53c59b # v1.16
+      - uses: Rethunk-Tech/gh-actions/setup-python@043d9f8fb8b04b983fa8f7012b28241fd20f17b4 # v1.18
         with:
           python-version: ${{ matrix.python-version }}
           install-args: --locked
