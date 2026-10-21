@@ -7,3 +7,6 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Claude Code agent worktrees: full nested checkouts of this repo.
+/.claude/worktrees/
