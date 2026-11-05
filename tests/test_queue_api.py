@@ -327,7 +327,7 @@ class QueueApiTests(unittest.TestCase):
     def test_http_server_health(self) -> None:
         handler = make_handler(self.settings)
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread = threading.Thread(target=httpd.serve_forever, args=(0.01,), daemon=True)
         thread.start()
         try:
             host = str(httpd.server_name)
