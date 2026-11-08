@@ -63,7 +63,8 @@ def _under_root(root: Path, path: Path) -> Path:
     raw = os.fspath(path)
     joined = raw if os.path.isabs(raw) else os.path.join(base, raw)
     target = os.path.realpath(joined)
-    if os.path.commonpath([base, target]) != base:
+    prefix = base if base.endswith(os.sep) else base + os.sep
+    if not target.startswith(prefix):
         raise QueueStoreError("path escapes data directory")
     return Path(target)
 
@@ -93,7 +94,7 @@ def _atomic_write(root: Path, path: Path, data: dict[str, Any]) -> None:
         with os.fdopen(fd, "w") as handle:
             json.dump(data, handle, indent=2, sort_keys=True)
             handle.write("\n")
-        os.replace(_under_root(root, Path(tmp)), path)
+        os.replace(tmp, path)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)

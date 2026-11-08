@@ -9,6 +9,7 @@ import pytest
 
 from bakeoff_results.queue_store import (
     QueueStoreError,
+    _under_root,
     enqueue,
     get_runner,
     heartbeat,
@@ -40,6 +41,17 @@ def test_get_runner_rejects_path_injection(runner_id: str) -> None:
     root = _root()
     with pytest.raises(QueueStoreError, match="invalid runner_id"):
         get_runner(root, runner_id)
+
+
+def test_under_root_rejects_sibling_prefix_and_root() -> None:
+    root = _root()
+    with pytest.raises(QueueStoreError, match="path escapes data directory"):
+        _under_root(root, Path(f"{root}-evil") / "runner-1.json")
+    with pytest.raises(QueueStoreError, match="path escapes data directory"):
+        _under_root(root, root)
+    assert (
+        _under_root(root, root / "runners" / "runner-1.json") == root / "runners" / "runner-1.json"
+    )
 
 
 def test_upsert_runner_accepts_safe_id() -> None:
