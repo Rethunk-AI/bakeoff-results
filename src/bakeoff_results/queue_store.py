@@ -19,6 +19,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -44,10 +45,27 @@ RUNNER_DEAD = "DEAD"
 _DEFAULT_DATA_DIR = "~/.local/share/bakeoff-results"
 _RETRY_BACKOFF_MINUTES = 5
 _RETRY_PRIORITY_BUMP = 5
+_SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$")
 
 
 class QueueStoreError(ValueError):
     """Raised when a queue or roster operation cannot be completed."""
+
+
+def _safe_id(value: str, field: str) -> str:
+    if not _SAFE_ID.fullmatch(value):
+        raise QueueStoreError(f"invalid {field}")
+    return value
+
+
+def _under_root(root: Path, path: Path) -> Path:
+    base = os.path.realpath(root)
+    raw = os.fspath(path)
+    joined = raw if os.path.isabs(raw) else os.path.join(base, raw)
+    target = os.path.realpath(joined)
+    if os.path.commonpath([base, target]) != base:
+        raise QueueStoreError("path escapes data directory")
+    return Path(target)
 
 
 def data_dir() -> Path:
@@ -67,21 +85,23 @@ def _now_dt() -> datetime:
     return datetime.now(UTC)
 
 
-def _atomic_write(path: Path, data: dict[str, Any]) -> None:
+def _atomic_write(root: Path, path: Path, data: dict[str, Any]) -> None:
+    path = _under_root(root, path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as handle:
             json.dump(data, handle, indent=2, sort_keys=True)
             handle.write("\n")
-        os.replace(tmp, path)
+        os.replace(_under_root(root, Path(tmp)), path)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)
         raise
 
 
-def _read_json(path: Path) -> dict[str, Any]:
+def _read_json(root: Path, path: Path) -> dict[str, Any]:
+    path = _under_root(root, path)
     with path.open() as handle:
         data: dict[str, Any] = json.load(handle)
     if not isinstance(data, dict):
@@ -106,15 +126,18 @@ def completed_dir(root: Path) -> Path:
 
 
 def _pending_path(root: Path, queue_id: str) -> Path:
-    return pending_dir(root) / f"{queue_id}.json"
+    name = f"{_safe_id(queue_id, 'queue_id')}.json"
+    return _under_root(root, pending_dir(root) / name)
 
 
 def _completed_path(root: Path, queue_id: str) -> Path:
-    return completed_dir(root) / f"{queue_id}.json"
+    name = f"{_safe_id(queue_id, 'queue_id')}.json"
+    return _under_root(root, completed_dir(root) / name)
 
 
 def _lock_path(root: Path, queue_id: str, runner_id: str) -> Path:
-    return pending_dir(root) / f"{queue_id}.lck-{runner_id}"
+    name = f"{_safe_id(queue_id, 'queue_id')}.lck-{_safe_id(runner_id, 'runner_id')}"
+    return _under_root(root, pending_dir(root) / name)
 
 
 def _runners_dir(root: Path) -> Path:
@@ -124,7 +147,8 @@ def _runners_dir(root: Path) -> Path:
 
 
 def _runner_path(root: Path, runner_id: str) -> Path:
-    return _runners_dir(root) / f"{runner_id}.json"
+    name = f"{_safe_id(runner_id, 'runner_id')}.json"
+    return _under_root(root, _runners_dir(root) / name)
 
 
 def _whitelist_path(root: Path) -> Path:
@@ -135,7 +159,7 @@ def load_whitelist(root: Path) -> list[str]:
     path = _whitelist_path(root)
     if not path.is_file():
         return []
-    data = _read_json(path)
+    data = _read_json(root, path)
     keys = data.get("public_keys", [])
     if not isinstance(keys, list) or not all(isinstance(item, str) and item for item in keys):
         raise QueueStoreError("whitelist.json public_keys must be a list of strings")
@@ -149,7 +173,7 @@ def save_whitelist(root: Path, public_keys: list[str]) -> None:
         if key not in seen:
             unique.append(key)
             seen.add(key)
-    _atomic_write(_whitelist_path(root), {"public_keys": unique})
+    _atomic_write(root, _whitelist_path(root), {"public_keys": unique})
 
 
 def add_whitelist_key(root: Path, public_key: str) -> list[str]:
@@ -172,7 +196,7 @@ def upsert_runner(root: Path, runner: dict[str, Any]) -> dict[str, Any]:
     existing: dict[str, Any] | None = None
     if path.is_file():
         with contextlib.suppress(OSError, json.JSONDecodeError, QueueStoreError):
-            existing = _read_json(path)
+            existing = _read_json(root, path)
     now = utc_now()
     out = dict(existing or {})
     out.update(runner)
@@ -180,7 +204,7 @@ def upsert_runner(root: Path, runner: dict[str, Any]) -> dict[str, Any]:
     out.setdefault("status", RUNNER_IDLE)
     out.setdefault("registered_at", now)
     out["updated_at"] = now
-    _atomic_write(path, out)
+    _atomic_write(root, path, out)
     return out
 
 
@@ -188,14 +212,14 @@ def get_runner(root: Path, runner_id: str) -> dict[str, Any] | None:
     path = _runner_path(root, runner_id)
     if not path.is_file():
         return None
-    return _read_json(path)
+    return _read_json(root, path)
 
 
 def list_runners(root: Path) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for path in _runners_dir(root).glob("*.json"):
         with contextlib.suppress(OSError, json.JSONDecodeError, QueueStoreError):
-            items.append(_read_json(path))
+            items.append(_read_json(root, path))
     items.sort(key=lambda item: str(item.get("runner_id", "")))
     return items
 
@@ -210,7 +234,7 @@ def set_runner_status(root: Path, runner_id: str, status: str) -> dict[str, Any]
     runner["updated_at"] = utc_now()
     if status == RUNNER_DEAD:
         runner["current_claim"] = None
-    _atomic_write(_runner_path(root, runner_id), runner)
+    _atomic_write(root, _runner_path(root, runner_id), runner)
     return runner
 
 
@@ -233,7 +257,7 @@ def enqueue(root: Path, item: dict[str, Any]) -> dict[str, Any]:
     out.setdefault("attempt_count", 0)
     out.setdefault("max_attempts", 5)
     out = _stamp(out)
-    _atomic_write(_pending_path(root, str(out["queue_id"])), out)
+    _atomic_write(root, _pending_path(root, str(out["queue_id"])), out)
     return out
 
 
@@ -255,10 +279,10 @@ def _job_eligible(item: dict[str, Any], capabilities: dict[str, Any] | None) -> 
 def _lookup_pending(root: Path, job_id: str) -> tuple[Path, dict[str, Any]] | None:
     direct = _pending_path(root, job_id)
     if direct.is_file():
-        return direct, _read_json(direct)
+        return direct, _read_json(root, direct)
     for path in pending_dir(root).glob("*.json"):
         try:
-            data = _read_json(path)
+            data = _read_json(root, path)
         except (OSError, json.JSONDecodeError, QueueStoreError):
             continue
         if str(data.get("queue_id")) == job_id or str(data.get("run_id")) == job_id:
@@ -277,7 +301,7 @@ def claim(
     candidates: list[tuple[int, str, str]] = []
     for path in pending.glob("*.json"):
         try:
-            data = _read_json(path)
+            data = _read_json(root, path)
         except (OSError, json.JSONDecodeError, QueueStoreError):
             continue
         if data.get("status") != STATUS_PENDING:
@@ -306,7 +330,7 @@ def claim(
             continue
 
         try:
-            data = _read_json(lock)
+            data = _read_json(root, lock)
             if data.get("status") != STATUS_PENDING:
                 with contextlib.suppress(OSError):
                     os.rename(lock, src)
@@ -338,7 +362,7 @@ def claim(
             runner["status"] = RUNNER_ACTIVE
             runner["current_claim"] = queue_id
             runner["last_heartbeat"] = utc_now()
-            _atomic_write(_runner_path(root, runner_id), runner)
+            _atomic_write(root, _runner_path(root, runner_id), runner)
         return data
     return None
 
@@ -357,12 +381,12 @@ def heartbeat(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
     data["last_heartbeat"] = now_str
     data.setdefault("started_at", now_str)
     data["updated_at"] = now_str
-    _atomic_write(path, data)
+    _atomic_write(root, path, data)
     runner = get_runner(root, runner_id)
     if runner is not None:
         runner["last_heartbeat"] = now_str
         runner["status"] = RUNNER_ACTIVE
-        _atomic_write(_runner_path(root, runner_id), runner)
+        _atomic_write(root, _runner_path(root, runner_id), runner)
     return data
 
 
@@ -378,7 +402,7 @@ def complete(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
     data["completed_at"] = now_str
     data["updated_at"] = now_str
     queue_id = str(data.get("queue_id", src.stem))
-    _atomic_write(_completed_path(root, queue_id), data)
+    _atomic_write(root, _completed_path(root, queue_id), data)
     with contextlib.suppress(FileNotFoundError):
         src.unlink()
     runner = get_runner(root, runner_id)
@@ -387,7 +411,7 @@ def complete(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
             runner["status"] = RUNNER_IDLE
         runner["current_claim"] = None
         runner["last_heartbeat"] = now_str
-        _atomic_write(_runner_path(root, runner_id), runner)
+        _atomic_write(root, _runner_path(root, runner_id), runner)
     return data
 
 
@@ -416,13 +440,13 @@ def fail(root: Path, job_id: str, error: str, runner_id: str | None = None) -> d
         data["retry_after"] = retry_dt.strftime(_ISO_FMT)
         data["priority"] = int(data.get("priority", 100)) + _RETRY_PRIORITY_BUMP * attempt
         data["updated_at"] = now_str
-        _atomic_write(src, data)
+        _atomic_write(root, src, data)
     else:
         data["status"] = STATUS_FAILED
         data["completed_at"] = now_str
         data["updated_at"] = now_str
         queue_id = str(data.get("queue_id", src.stem))
-        _atomic_write(_completed_path(root, queue_id), data)
+        _atomic_write(root, _completed_path(root, queue_id), data)
         with contextlib.suppress(FileNotFoundError):
             src.unlink()
 
@@ -432,7 +456,7 @@ def fail(root: Path, job_id: str, error: str, runner_id: str | None = None) -> d
             if runner.get("status") != RUNNER_PAUSED:
                 runner["status"] = RUNNER_IDLE
             runner["current_claim"] = None
-            _atomic_write(_runner_path(root, owner), runner)
+            _atomic_write(root, _runner_path(root, owner), runner)
     return data
 
 
@@ -448,7 +472,7 @@ def requeue(root: Path, job_id: str) -> dict[str, Any]:
         data["last_heartbeat"] = None
         data["retry_after"] = None
         data["updated_at"] = utc_now()
-        _atomic_write(src, data)
+        _atomic_write(root, src, data)
         if isinstance(runner_id, str):
             runner = get_runner(root, runner_id)
             if runner is not None and runner.get("current_claim") in {
@@ -458,13 +482,13 @@ def requeue(root: Path, job_id: str) -> dict[str, Any]:
             }:
                 runner["status"] = RUNNER_IDLE
                 runner["current_claim"] = None
-                _atomic_write(_runner_path(root, runner_id), runner)
+                _atomic_write(root, _runner_path(root, runner_id), runner)
         return data
 
     completed = None
     for path in completed_dir(root).glob("*.json"):
         try:
-            data = _read_json(path)
+            data = _read_json(root, path)
         except (OSError, json.JSONDecodeError, QueueStoreError):
             continue
         if str(data.get("queue_id")) == job_id or str(data.get("run_id")) == job_id:
@@ -482,7 +506,7 @@ def requeue(root: Path, job_id: str) -> dict[str, Any]:
     data["retry_after"] = None
     data["updated_at"] = utc_now()
     queue_id = str(data["queue_id"])
-    _atomic_write(_pending_path(root, queue_id), data)
+    _atomic_write(root, _pending_path(root, queue_id), data)
     with contextlib.suppress(FileNotFoundError):
         path.unlink()
     return data
@@ -494,7 +518,7 @@ def reap_stale_claims(root: Path, timeout_seconds: int) -> list[str]:
     reaped: list[str] = []
     for path in pending_dir(root).glob("*.json"):
         try:
-            data = _read_json(path)
+            data = _read_json(root, path)
         except (OSError, json.JSONDecodeError, QueueStoreError):
             continue
         if data.get("status") not in {STATUS_CLAIMED, STATUS_IN_PROGRESS}:
@@ -518,14 +542,14 @@ def reap_stale_claims(root: Path, timeout_seconds: int) -> list[str]:
         data["last_heartbeat"] = None
         data["updated_at"] = now_str
         with contextlib.suppress(OSError, QueueStoreError):
-            _atomic_write(path, data)
+            _atomic_write(root, path, data)
             reaped.append(queue_id)
         if isinstance(runner_id, str):
             runner = get_runner(root, runner_id)
             if runner is not None:
                 runner["status"] = RUNNER_DEAD
                 runner["current_claim"] = None
-                _atomic_write(_runner_path(root, runner_id), runner)
+                _atomic_write(root, _runner_path(root, runner_id), runner)
     return reaped
 
 
@@ -533,7 +557,7 @@ def list_pending(root: Path) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for path in pending_dir(root).glob("*.json"):
         with contextlib.suppress(OSError, json.JSONDecodeError, QueueStoreError):
-            items.append(_read_json(path))
+            items.append(_read_json(root, path))
     return items
 
 
@@ -541,7 +565,7 @@ def list_completed(root: Path) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for path in completed_dir(root).glob("*.json"):
         with contextlib.suppress(OSError, json.JSONDecodeError, QueueStoreError):
-            items.append(_read_json(path))
+            items.append(_read_json(root, path))
     return items
 
 
@@ -551,9 +575,16 @@ def write_submission(
     run_id: str,
     envelope: dict[str, Any],
 ) -> Path:
-    dest = root / "submissions" / runner_id / run_id / "envelope.json"
-    _atomic_write(dest, envelope)
+    dest = _under_root(
+        root,
+        root
+        / "submissions"
+        / _safe_id(runner_id, "runner_id")
+        / _safe_id(run_id, "run_id")
+        / "envelope.json",
+    )
+    _atomic_write(root, dest, envelope)
     result = envelope.get("result")
     if isinstance(result, dict):
-        _atomic_write(dest.with_name("result.json"), result)
+        _atomic_write(root, dest.with_name("result.json"), result)
     return dest.parent
