@@ -35,7 +35,7 @@ Python 3.12+. Validator and index builder stay stdlib-only. The queue server add
 ## Invariants
 
 - Manifest SHA256 entries must match file contents — never edit bundle files after manifest is written.
-- `signers.yaml` is live policy; validator does not read it yet.
+- `signers.yaml` is live policy; the validator rejects a submission whose signer is not allowlisted.
 - `site/` is generated — rebuild via `build_index.py`, do not hand-edit.
 - Claim is rename-as-mutex on JSON files under `BAKEOFF_RESULTS_DATA_DIR`; do not add a SQL runtime to this package.
 - Queue submit verifies the bakeoff Ed25519 envelope against the registered public key, then `validate_result`.
