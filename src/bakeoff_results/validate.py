@@ -1,8 +1,7 @@
 """Validate packaged bakeoff result bundles.
 
-The validator intentionally performs structural and integrity checks only. It
-expects Sigstore/Rekor verification to happen in CI with the Sigstore tooling
-once the submitting workflow and identity policy are finalized.
+Structural and integrity checks include signer allowlisting against
+signers.yaml. Sigstore/Rekor cryptographic verification happens in CI.
 """
 
 from __future__ import annotations
@@ -18,13 +17,140 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "bakeoff-results/v1"
+SIGNERS_SCHEMA_VERSION = "bakeoff-results-signers/v1"
 REQUIRED_BUNDLE_FILES = ("result.json", "manifest.json", "summary.md")
 OPTIONAL_BUNDLE_FILES = ("dashboard.html", "signature.sigstore.json")
 HEX_SHA256 = re.compile(r"^[0-9a-fA-F]{64}$")
+_SIGNERS_PATH = Path(__file__).resolve().parents[2] / "signers.yaml"
 
 
 class BundleValidationError(ValueError):
     """Raised when a bundle fails validation."""
+
+
+def _parse_yaml_subset(text: str) -> Any:
+    """Parse the indent-based YAML subset used by signers.yaml (stdlib-only)."""
+
+    tokens: list[tuple[int, str]] = []
+    for raw in text.splitlines():
+        stripped = raw.lstrip(" ")
+        if not stripped or stripped.startswith("#"):
+            continue
+        tokens.append((len(raw) - len(stripped), stripped))
+
+    def parse(index: int, indent: int) -> tuple[Any, int]:
+        if index < len(tokens) and tokens[index][1].startswith("- "):
+            return parse_list(index, indent)
+        return parse_map(index, indent)
+
+    def parse_map(index: int, indent: int) -> tuple[dict[str, Any], int]:
+        out: dict[str, Any] = {}
+        while index < len(tokens):
+            line_indent, content = tokens[index]
+            if line_indent < indent or content.startswith("- "):
+                break
+            if line_indent != indent:
+                raise BundleValidationError("signers.yaml is malformed")
+            key, sep, rest = content.partition(":")
+            if not sep:
+                raise BundleValidationError("signers.yaml is malformed")
+            index += 1
+            rest = rest.strip()
+            if rest:
+                out[key.strip()] = rest
+            elif index < len(tokens) and tokens[index][0] > indent:
+                out[key.strip()], index = parse(index, tokens[index][0])
+            else:
+                out[key.strip()] = None
+        return out, index
+
+    def parse_list(index: int, indent: int) -> tuple[list[Any], int]:
+        out: list[Any] = []
+        while index < len(tokens):
+            line_indent, content = tokens[index]
+            if line_indent < indent:
+                break
+            if line_indent != indent or not content.startswith("- "):
+                break
+            body = content[2:]
+            index += 1
+            if body.endswith(":") or ": " in body:
+                key, _sep, rest = body.partition(":")
+                item: dict[str, Any] = {}
+                rest = rest.strip()
+                if rest:
+                    item[key.strip()] = rest
+                elif index < len(tokens) and tokens[index][0] > indent:
+                    item[key.strip()], index = parse(index, tokens[index][0])
+                else:
+                    item[key.strip()] = None
+                if (
+                    index < len(tokens)
+                    and tokens[index][0] > indent
+                    and not tokens[index][1].startswith("- ")
+                ):
+                    nested, index = parse_map(index, tokens[index][0])
+                    item.update(nested)
+                out.append(item)
+            else:
+                out.append(body)
+        return out, index
+
+    if not tokens:
+        raise BundleValidationError("signers.yaml is malformed")
+    value, index = parse(0, tokens[0][0])
+    if index != len(tokens):
+        raise BundleValidationError("signers.yaml is malformed")
+    return value
+
+
+def _load_signers() -> dict[str, Any]:
+    if not _SIGNERS_PATH.is_file():
+        raise BundleValidationError(f"signers allowlist not found: {_SIGNERS_PATH}")
+    data = _parse_yaml_subset(_SIGNERS_PATH.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise BundleValidationError("signers.yaml is malformed")
+    if data.get("schema_version") != SIGNERS_SCHEMA_VERSION:
+        raise BundleValidationError(
+            f"signers.yaml schema_version must be {SIGNERS_SCHEMA_VERSION!r}"
+        )
+    return data
+
+
+def _issuer_matches(signer: dict[str, Any], allowed_issuer: object) -> bool:
+    if not isinstance(allowed_issuer, str) or not allowed_issuer:
+        return True
+    return signer.get("issuer") == allowed_issuer
+
+
+def _signer_allowlisted(signer: dict[str, Any], policy: dict[str, Any]) -> bool:
+    identities = policy.get("trusted_identities")
+    if isinstance(identities, list):
+        for entry in identities:
+            if not isinstance(entry, dict):
+                continue
+            allowed_id = entry.get("identity")
+            if (
+                isinstance(allowed_id, str)
+                and signer.get("identity") == allowed_id
+                and _issuer_matches(signer, entry.get("issuer"))
+            ):
+                return True
+
+    repositories = policy.get("trusted_repositories")
+    if isinstance(repositories, list):
+        for entry in repositories:
+            if not isinstance(entry, dict):
+                continue
+            if not _issuer_matches(signer, entry.get("issuer")):
+                continue
+            allowed_repo = entry.get("repository")
+            if isinstance(allowed_repo, str) and signer.get("repository") == allowed_repo:
+                return True
+            subjects = entry.get("subjects")
+            if isinstance(subjects, list) and signer.get("subject") in subjects:
+                return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -183,6 +309,9 @@ def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None
     policy = signer.get("policy")
     if policy is not None and not isinstance(policy, (str, dict)):
         raise BundleValidationError("manifest signer policy must be a string or object")
+
+    if not _signer_allowlisted(signer, _load_signers()):
+        raise BundleValidationError("manifest signer is not allowlisted")
 
     signature_path = bundle_dir / "signature.sigstore.json"
     if signature_path.exists():

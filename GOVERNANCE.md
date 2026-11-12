@@ -8,13 +8,13 @@ approval is granted.
 ## Signer Policy
 
 Accepted submissions must come from the approved `Rethunk-AI/bakeoff` release
-workflow or another explicitly allowlisted identity. The current placeholder
-allowlist shape is documented in `signers.example.yaml`.
+workflow or another explicitly allowlisted identity. The live allowlist is
+`signers.yaml`; `signers.example.yaml` documents the schema shape.
 
 Bundles may include `signature.sigstore.json` with Sigstore/Rekor verification
-material. The local validator checks that signer metadata and transparency-log
-material are structurally present; CI should later add full Sigstore verification
-and GitHub artifact attestations for generated index artifacts.
+material. The local validator checks signer metadata against that allowlist and
+that transparency-log material is structurally present. CI runs full Sigstore
+bundle verification and GitHub artifact attestations for generated index artifacts.
 
 ## Result States
 
