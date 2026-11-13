@@ -255,6 +255,56 @@ class QueueApiTests(unittest.TestCase):
         assert claimed is not None
         self.assertEqual(claimed["job"]["queue_id"], "paused-job")
 
+    def _registered(self) -> tuple[str, str]:
+        _, registered = self._dispatch(
+            "POST", "/api/runners/register", {"public_key": self.public, "hostname": "box"}
+        )
+        assert registered is not None
+        return registered["token"], registered["runner"]["runner_id"]
+
+    def _runner_status(self, runner_id: str) -> str:
+        _, data = self._dispatch("GET", "/api/runners", admin=True)
+        assert data is not None
+        return next(r["status"] for r in data["runners"] if r["runner_id"] == runner_id)
+
+    def test_revoked_runner_cannot_submit_or_revive(self) -> None:
+        token, runner_id = self._registered()
+        enqueue(self.root, {"model_id": "m", "run_id": "job-r", "queue_id": "job-r"})
+        self._dispatch("POST", "/api/queue/claim", {}, token=token)
+        self._dispatch(
+            "POST", "/api/admin/keys", {"action": "remove", "public_key": self.public}, admin=True
+        )
+        envelope = sign_result(_result("job-r"), self.private, runner_id)
+        for path, payload in (
+            ("/api/queue/job-r/submit", envelope),
+            ("/api/queue/job-r/heartbeat", {}),
+            ("/api/queue/job-r/fail", {"error": "x"}),
+        ):
+            status, _ = self._dispatch("POST", path, payload, token=token)
+            self.assertEqual(status, 401, path)
+        self.assertEqual(self._runner_status(runner_id), "DEAD")
+        self.assertFalse((self.root / "submissions").exists())
+
+    def test_paused_runner_stays_paused_through_heartbeat_and_reregister(self) -> None:
+        token, runner_id = self._registered()
+        enqueue(self.root, {"model_id": "m", "run_id": "job-p", "queue_id": "job-p"})
+        self._dispatch("POST", "/api/queue/claim", {}, token=token)
+        self._dispatch(
+            "POST", f"/api/admin/runners/{runner_id}/status", {"status": "PAUSED"}, admin=True
+        )
+        self._dispatch("POST", "/api/queue/job-p/heartbeat", {}, token=token)
+        self.assertEqual(self._runner_status(runner_id), "PAUSED")
+        self._registered()
+        self.assertEqual(self._runner_status(runner_id), "PAUSED")
+
+    def test_submit_for_unclaimed_job_writes_nothing(self) -> None:
+        token, runner_id = self._registered()
+        enqueue(self.root, {"model_id": "m", "run_id": "job-x", "queue_id": "job-x"})
+        envelope = sign_result(_result("job-x"), self.private, runner_id)
+        status, _ = self._dispatch("POST", "/api/queue/job-x/submit", envelope, token=token)
+        self.assertEqual(status, 400)
+        self.assertFalse((self.root / "submissions").exists())
+
     def test_fail_reports_error_and_requeues(self) -> None:
         status, registered = self._dispatch(
             "POST",

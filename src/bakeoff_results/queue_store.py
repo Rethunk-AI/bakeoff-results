@@ -277,6 +277,20 @@ def _job_eligible(item: dict[str, Any], capabilities: dict[str, Any] | None) -> 
     return True
 
 
+def _settle_status(runner: dict[str, Any], status: str) -> None:
+    """Set a runner's activity status unless an admin has paused or revoked it."""
+    if runner.get("status") not in {RUNNER_PAUSED, RUNNER_DEAD}:
+        runner["status"] = status
+
+
+def assert_claimed(root: Path, job_id: str, runner_id: str) -> None:
+    found = _lookup_pending(root, job_id)
+    if found is None:
+        raise QueueStoreError(f"unknown in-flight job: {job_id}")
+    if found[1].get("claimed_by") != runner_id:
+        raise QueueStoreError("job is not claimed by this runner")
+
+
 def _lookup_pending(root: Path, job_id: str) -> tuple[Path, dict[str, Any]] | None:
     direct = _pending_path(root, job_id)
     if direct.is_file():
@@ -360,7 +374,7 @@ def claim(
         os.rename(lock, src)
         runner = get_runner(root, runner_id)
         if runner is not None:
-            runner["status"] = RUNNER_ACTIVE
+            _settle_status(runner, RUNNER_ACTIVE)
             runner["current_claim"] = queue_id
             runner["last_heartbeat"] = utc_now()
             _atomic_write(root, _runner_path(root, runner_id), runner)
@@ -386,7 +400,7 @@ def heartbeat(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
     runner = get_runner(root, runner_id)
     if runner is not None:
         runner["last_heartbeat"] = now_str
-        runner["status"] = RUNNER_ACTIVE
+        _settle_status(runner, RUNNER_ACTIVE)
         _atomic_write(root, _runner_path(root, runner_id), runner)
     return data
 
@@ -408,8 +422,7 @@ def complete(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
         src.unlink()
     runner = get_runner(root, runner_id)
     if runner is not None:
-        if runner.get("status") != RUNNER_PAUSED:
-            runner["status"] = RUNNER_IDLE
+        _settle_status(runner, RUNNER_IDLE)
         runner["current_claim"] = None
         runner["last_heartbeat"] = now_str
         _atomic_write(root, _runner_path(root, runner_id), runner)
@@ -454,8 +467,7 @@ def fail(root: Path, job_id: str, error: str, runner_id: str | None = None) -> d
     if isinstance(owner, str):
         runner = get_runner(root, owner)
         if runner is not None:
-            if runner.get("status") != RUNNER_PAUSED:
-                runner["status"] = RUNNER_IDLE
+            _settle_status(runner, RUNNER_IDLE)
             runner["current_claim"] = None
             _atomic_write(root, _runner_path(root, owner), runner)
     return data
@@ -481,7 +493,7 @@ def requeue(root: Path, job_id: str) -> dict[str, Any]:
                 data.get("run_id"),
                 job_id,
             }:
-                runner["status"] = RUNNER_IDLE
+                _settle_status(runner, RUNNER_IDLE)
                 runner["current_claim"] = None
                 _atomic_write(root, _runner_path(root, runner_id), runner)
         return data

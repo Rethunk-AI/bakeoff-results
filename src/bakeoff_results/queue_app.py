@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 from bakeoff_results.queue_auth import AuthError, mint_token, parse_token, require_admin
 from bakeoff_results.queue_signing import SigningError, verify_result
 from bakeoff_results.queue_store import (
+    assert_claimed,
     add_whitelist_key,
     claim,
     complete,
@@ -93,6 +94,17 @@ def _require_runner(settings: QueueSettings, headers: dict[str, str]) -> str:
     if token is None:
         raise AuthError("runner token required")
     return parse_token(settings.secret, token)
+
+
+def _active_runner(settings: QueueSettings, headers: dict[str, str]) -> tuple[str, dict[str, Any]]:
+    """Authenticate the bearer and refuse runners that were never registered or are revoked."""
+    runner_id = _require_runner(settings, headers)
+    runner = get_runner(settings.data_dir, runner_id)
+    if runner is None:
+        raise AuthError("runner is not registered")
+    if runner.get("status") == "DEAD":
+        raise AuthError("runner is revoked")
+    return runner_id, runner
 
 
 def dispatch(
@@ -182,6 +194,8 @@ def _register(settings: QueueSettings, payload: dict[str, Any]) -> AppResponse:
     capabilities = payload.get("capabilities")
     if capabilities is not None and not isinstance(capabilities, dict):
         return _error(400, "capabilities must be an object")
+    existing = get_runner(settings.data_dir, runner_id)
+    paused = existing is not None and existing.get("status") == "PAUSED"
     runner = upsert_runner(
         settings.data_dir,
         {
@@ -192,7 +206,7 @@ def _register(settings: QueueSettings, payload: dict[str, Any]) -> AppResponse:
             "effective_user": payload.get("effective_user"),
             "description": payload.get("description"),
             "capabilities": capabilities or {},
-            "status": "IDLE",
+            "status": "PAUSED" if paused else "IDLE",
         },
     )
     token, exp = mint_token(settings.secret, runner_id, settings.token_ttl_s)
@@ -280,7 +294,7 @@ def _list_queue(settings: QueueSettings, query: dict[str, list[str]]) -> AppResp
 
 
 def _heartbeat(settings: QueueSettings, headers: dict[str, str], job_id: str) -> AppResponse:
-    runner_id = _require_runner(settings, headers)
+    runner_id, _runner = _active_runner(settings, headers)
     return _json(200, {"job": heartbeat(settings.data_dir, job_id, runner_id)})
 
 
@@ -290,7 +304,7 @@ def _fail(
     job_id: str,
     payload: dict[str, Any],
 ) -> AppResponse:
-    runner_id = _require_runner(settings, headers)
+    runner_id, _runner = _active_runner(settings, headers)
     error = payload.get("error") or payload.get("error_detail") or "runner reported failure"
     if not isinstance(error, str) or not error.strip():
         return _error(400, "error is required")
@@ -303,10 +317,7 @@ def _submit(
     job_id: str,
     payload: dict[str, Any],
 ) -> AppResponse:
-    runner_id = _require_runner(settings, headers)
-    runner = get_runner(settings.data_dir, runner_id)
-    if runner is None:
-        return _error(403, "runner is not registered")
+    runner_id, runner = _active_runner(settings, headers)
     wrapped = payload.get("envelope")
     envelope = wrapped if isinstance(wrapped, dict) else payload
     result = verify_result(envelope, str(runner["public_key"]))
@@ -314,6 +325,7 @@ def _submit(
     if isinstance(sig, dict) and sig.get("runner_id") not in {None, runner_id}:
         return _error(400, "envelope runner_id does not match bearer")
     validate_result(result)
+    assert_claimed(settings.data_dir, job_id, runner_id)
     dest = write_submission(settings.data_dir, runner_id, str(result["run_id"]), envelope)
     job = complete(settings.data_dir, job_id, runner_id)
     return _json(200, {"job": job, "stored": str(dest)})
