@@ -13,8 +13,8 @@ from urllib.parse import parse_qs, urlparse
 from bakeoff_results.queue_auth import AuthError, mint_token, parse_token, require_admin
 from bakeoff_results.queue_signing import SigningError, verify_result
 from bakeoff_results.queue_store import (
-    assert_claimed,
     add_whitelist_key,
+    assert_claimed,
     claim,
     complete,
     enqueue,
