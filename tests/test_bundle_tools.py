@@ -10,7 +10,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bakeoff_results.build_index import build_index
+from bakeoff_results.build_index import _fmt_score, _hw_tier, build_index
 from bakeoff_results.validate import BundleValidationError, validate_bundle
 
 
@@ -574,3 +574,22 @@ class IndexBuilderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HwTierAndScoreFormatTests(unittest.TestCase):
+    def test_integrated_and_apple_gpus_are_gpu_tier(self) -> None:
+        for name in (
+            "Radeon 8060S",
+            "AMD Radeon Graphics",
+            "Intel Arc A770",
+            "Intel Iris Xe",
+            "Apple M2 Max",
+        ):
+            self.assertEqual(_hw_tier({"device_name": name})[0], "GPU", name)
+        self.assertEqual(_hw_tier({"device_name": "AMD EPYC 7763"})[0], "CPU")
+
+    def test_score_never_rounds_up_to_perfect(self) -> None:
+        self.assertEqual(_fmt_score(0.996), "0.99")
+        self.assertEqual(_fmt_score(0.29), "0.29")
+        self.assertEqual(_fmt_score(1.0), "1.00")
+        self.assertEqual(_fmt_score(0), "0.00")
