@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 from datetime import UTC, datetime
+from decimal import ROUND_DOWN, Decimal
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
@@ -238,6 +239,11 @@ def _failure_reason(result: dict[str, Any], manifest: dict[str, Any] | None = No
     return None
 
 
+def _fmt_score(value: float) -> str:
+    """Two decimals, truncated so an incomplete 0.996 never displays as a perfect score."""
+    return str(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_DOWN))
+
+
 def _score(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> str | None:
     """Relative/partial score so weak or non-finishing runs still rank.
 
@@ -263,7 +269,7 @@ def _score(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> st
             ]
             if vals:
                 mean_score = sum(vals) / len(vals)
-                return f"{mean_score:.2g}"
+                return _fmt_score(mean_score)
     # Priority 2: legacy top-level fields (legacy bundles and hand-authored fixtures)
     for key in ("score", "partial_score"):
         value = result.get(key)
@@ -361,6 +367,9 @@ def build_index(submissions_dir: Path | str, site_dir: Path | str) -> dict[str, 
     return payload
 
 
+_GPU_NAME_RE = re.compile(r"\b(RADEON|ARC|IRIS|APPLE M\d|M\d+ (PRO|MAX|ULTRA))\b", re.IGNORECASE)
+
+
 def _hw_tier(hw: str | dict) -> tuple[str, int]:
     """Classify hardware into tier + vram_mb (for range filtering)."""
     if not isinstance(hw, dict):
@@ -389,7 +398,7 @@ def _hw_tier(hw: str | dict) -> tuple[str, int]:
         "M60",
         "M61",
     )
-    if any(k in name.upper() for k in gpu_keywords):
+    if any(k in name.upper() for k in gpu_keywords) or _GPU_NAME_RE.search(name):
         tier = "GPU"
     elif "TPU" in name.upper() or "Tensor Processing Unit" in name:
         tier = "TPU"
@@ -572,7 +581,7 @@ def render_html(payload: dict[str, Any]) -> str:
             # Build display line: "model: score (incomplete) — failure_code"
             parts = []
             if isinstance(ms_score, (int, float)) and not isinstance(ms_score, bool):
-                score_str = f"{ms_score:.2g}"
+                score_str = _fmt_score(ms_score)
                 if ms_status != "complete":
                     score_str += f" ({ms_status or 'incomplete'})"
                 parts.append(score_str)
