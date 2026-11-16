@@ -21,7 +21,7 @@ SIGNERS_SCHEMA_VERSION = "bakeoff-results-signers/v1"
 REQUIRED_BUNDLE_FILES = ("result.json", "manifest.json", "summary.md")
 OPTIONAL_BUNDLE_FILES = ("dashboard.html", "signature.sigstore.json")
 HEX_SHA256 = re.compile(r"^[0-9a-fA-F]{64}$")
-_SIGNERS_PATH = Path(__file__).resolve().parents[2] / "signers.yaml"
+_SIGNERS_NAME = "signers.yaml"
 
 
 class BundleValidationError(ValueError):
@@ -104,10 +104,14 @@ def _parse_yaml_subset(text: str) -> Any:
     return value
 
 
-def _load_signers() -> dict[str, Any]:
-    if not _SIGNERS_PATH.is_file():
-        raise BundleValidationError(f"signers allowlist not found: {_SIGNERS_PATH}")
-    data = _parse_yaml_subset(_SIGNERS_PATH.read_text(encoding="utf-8"))
+def _load_signers(signers_path: Path | None = None) -> dict[str, Any]:
+    # The policy lives in the repo root, not beside the installed package:
+    # site-packages has no signers.yaml, so deriving the path from __file__
+    # would fail every bundle in an installed or tool-run layout.
+    path = Path(signers_path) if signers_path is not None else Path.cwd() / _SIGNERS_NAME
+    if not path.is_file():
+        raise BundleValidationError(f"signers allowlist not found: {path}")
+    data = _parse_yaml_subset(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise BundleValidationError("signers.yaml is malformed")
     if data.get("schema_version") != SIGNERS_SCHEMA_VERSION:
@@ -353,7 +357,11 @@ def _require_rekor_evidence(signature: dict[str, Any]) -> None:
         raise BundleValidationError("signature.sigstore.json Rekor entry is malformed")
 
 
-def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None:
+def validate_signer_metadata(
+    manifest: dict[str, Any],
+    bundle_dir: Path,
+    signers_path: Path | None = None,
+) -> None:
     signer = manifest.get("signer")
     if not isinstance(signer, dict):
         raise BundleValidationError("manifest requires a signer object")
@@ -373,7 +381,7 @@ def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None
     if policy is not None and not isinstance(policy, (str, dict)):
         raise BundleValidationError("manifest signer policy must be a string or object")
 
-    if not _signer_allowlisted(signer, _load_signers()):
+    if not _signer_allowlisted(signer, _load_signers(signers_path)):
         raise BundleValidationError("manifest signer is not allowlisted")
 
     signature_path = bundle_dir / "signature.sigstore.json"
@@ -381,7 +389,7 @@ def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None
         _require_rekor_evidence(load_json(signature_path))
 
 
-def validate_bundle(bundle_dir: Path | str) -> ValidatedBundle:
+def validate_bundle(bundle_dir: Path | str, signers_path: Path | None = None) -> ValidatedBundle:
     bundle_path = Path(bundle_dir)
     if not bundle_path.is_dir():
         raise BundleValidationError(f"bundle path is not a directory: {bundle_path}")
@@ -436,7 +444,7 @@ def validate_bundle(bundle_dir: Path | str) -> ValidatedBundle:
         if bundle_info.get("timestamp") not in (None, result.get("timestamp")):
             raise BundleValidationError("manifest bundle.timestamp does not match result.timestamp")
 
-    validate_signer_metadata(manifest, bundle_path)
+    validate_signer_metadata(manifest, bundle_path, signers_path)
     return ValidatedBundle(path=bundle_path, manifest=manifest, result=result)
 
 
@@ -468,7 +476,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--require-signature",
         action="store_true",
-        help="Fail any bundle that lacks signature.sigstore.json",
+        help="Fail any bundle that lacks signature.sigstore.json or its Rekor entry",
+    )
+    parser.add_argument(
+        "--signers",
+        type=Path,
+        default=None,
+        help="Path to signers.yaml (default: ./signers.yaml in the current directory)",
     )
     args = parser.parse_args(argv)
 
@@ -481,10 +495,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     for target in targets:
-        validate_bundle(target)
         if args.require_signature and not (Path(target) / "signature.sigstore.json").exists():
             print(f"UNSIGNED {target}", file=sys.stderr)
             return 1
+        validate_bundle(target, args.signers)
         print(f"OK {target}")
     return 0
 
