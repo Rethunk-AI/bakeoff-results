@@ -195,6 +195,8 @@ def _register(settings: QueueSettings, payload: dict[str, Any]) -> AppResponse:
     if capabilities is not None and not isinstance(capabilities, dict):
         return _error(400, "capabilities must be an object")
     existing = get_runner(settings.data_dir, runner_id)
+    if existing is not None and existing.get("public_key") != public_key:
+        return _error(403, "runner_id is owned by another public key")
     paused = existing is not None and existing.get("status") == "PAUSED"
     runner = upsert_runner(
         settings.data_dir,
