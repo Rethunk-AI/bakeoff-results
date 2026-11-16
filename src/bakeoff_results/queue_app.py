@@ -139,7 +139,7 @@ def dispatch(
             require_admin(headers, settings.admin_token)
             return _json(200, {"public_keys": load_whitelist(settings.data_dir)})
         if method == "POST" and route == "/api/queue/claim":
-            return _claim(settings, headers, _read_json(body))
+            return _claim(settings, headers)
         if method == "POST" and route == "/api/queue/enqueue":
             require_admin(headers, settings.admin_token)
             return _enqueue(settings, _read_json(body))
@@ -245,7 +245,6 @@ def _admin_keys(settings: QueueSettings, payload: dict[str, Any]) -> AppResponse
 def _claim(
     settings: QueueSettings,
     headers: dict[str, str],
-    payload: dict[str, Any],
 ) -> AppResponse:
     runner_id = _require_runner(settings, headers)
     runner = get_runner(settings.data_dir, runner_id)
@@ -255,11 +254,12 @@ def _claim(
         return _error(403, "runner is revoked")
     if runner.get("status") == "PAUSED":
         return _error(403, "runner is paused")
-    capabilities = payload.get("capabilities")
-    stored_caps = runner.get("capabilities")
-    if not isinstance(capabilities, dict):
-        capabilities = stored_caps if isinstance(stored_caps, dict) else {}
-    job = claim(settings.data_dir, runner_id, capabilities)
+    capabilities = runner.get("capabilities")
+    job = claim(
+        settings.data_dir,
+        runner_id,
+        capabilities if isinstance(capabilities, dict) else {},
+    )
     if job is None:
         return AppResponse(204, b"", "text/plain")
     return _json(

@@ -568,6 +568,32 @@ class QueueApiTests(unittest.TestCase):
         self.assertEqual([job["status"] for job in list_completed(self.root)], ["COMPLETE"])
         self.assertEqual(list_pending(self.root), [])
 
+    def test_claim_ignores_self_declared_capabilities(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, public_key = generate_keypair()
+            add_whitelist_key(root, public_key)
+            settings = QueueSettings(
+                data_dir=root, secret=b"s", admin_token="a", heartbeat_ttl_s=120
+            )
+            body = json.dumps({"public_key": public_key, "capabilities": {"vram_mb": 4096}})
+            response = dispatch(settings, "POST", "/api/runners/register", {}, body.encode())
+            headers = {"Authorization": f"Bearer {json.loads(response.body)['token']}"}
+            enqueue(
+                root,
+                {"model_id": "huge", "run_id": "huge", "min_vram_mb": 80000, "queue_id": "huge"},
+            )
+            payload = json.dumps({"capabilities": {"vram_mb": 1000000}}).encode()
+            self.assertEqual(
+                dispatch(settings, "POST", "/api/queue/claim", headers, payload).status, 204
+            )
+            self.assertEqual(
+                dispatch(settings, "POST", "/api/queue/claim", headers, b"{}").status, 204
+            )
+            still_pending = claim(root, "runner-2", {"vram_mb": 1000000})
+            assert still_pending is not None
+            self.assertEqual(still_pending["model_id"], "huge")
+
 
 if __name__ == "__main__":
     unittest.main()
