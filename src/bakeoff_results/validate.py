@@ -242,7 +242,11 @@ def _require_string(data: dict[str, Any], field: str, owner: str) -> str:
 
 def _model_ids(result: dict[str, Any]) -> list[str]:
     model_ids = result.get("model_ids")
-    if isinstance(model_ids, list) and all(isinstance(item, str) and item for item in model_ids):
+    if (
+        isinstance(model_ids, list)
+        and model_ids
+        and all(isinstance(item, str) and item for item in model_ids)
+    ):
         return model_ids
 
     models = result.get("models")
