@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+
+import pytest
 from pathlib import Path
 
 from bakeoff_results.signers_commit import check_signers_commit
@@ -39,7 +41,10 @@ def test_unsigned_signers_commit_fails_even_if_message_mentions_ssh(tmp_path: Pa
     assert check_signers_commit(repo) == 1
 
 
-def test_signed_signers_commit_passes(tmp_path: Path) -> None:
+def test_signed_signers_commit_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A CI runner has no allowed-signers file; a developer's global config must not supply one here.
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     repo = _init_repo(tmp_path)
     key = tmp_path / "id_ed25519"
     subprocess.run(
