@@ -367,7 +367,9 @@ def claim(
         queue_id = str(data.get("queue_id", path.stem))
         candidates.append((pri, created, queue_id))
 
-    candidates.sort(key=lambda item: (item[0], item[1]))
+    # Jobs enqueued in the same second tie on created_at, so the queue_id breaks the tie:
+    # otherwise claim order falls back to glob order, which varies with the filesystem.
+    candidates.sort(key=lambda item: (item[0], item[1], item[2]))
     for _, _, queue_id in candidates:
         src = _pending_path(root, queue_id)
         lock = _lock_path(root, queue_id, runner_id)
