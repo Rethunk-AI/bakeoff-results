@@ -43,7 +43,7 @@ def write_bundle(root: Path, signer: dict) -> Path:
 
 
 def signer(**overrides: object) -> dict:
-    fields = {
+    fields: dict[str, object] = {
         "identity": "github-actions[bot]",
         "issuer": OIDC,
         "repository": "Rethunk-AI/bakeoff",

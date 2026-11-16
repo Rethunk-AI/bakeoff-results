@@ -58,18 +58,16 @@ def write_bundle(
     }
     (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
     (bundle / "summary.md").write_text("# summary\n", encoding="utf-8")
-    manifest = {
-        "schema_version": "bakeoff-results/v1",
-        "files": {
-            "result.json": _sha256(bundle / "result.json"),
-            "summary.md": _sha256(bundle / "summary.md"),
-        },
+    files: dict[str, object] = {
+        "result.json": _sha256(bundle / "result.json"),
+        "summary.md": _sha256(bundle / "summary.md"),
     }
-    if signer is not None:
-        manifest["signer"] = signer
     if signature is not None:
         (bundle / "signature.sigstore.json").write_text(json.dumps(signature), encoding="utf-8")
-        manifest["files"]["signature.sigstore.json"] = _sha256(bundle / "signature.sigstore.json")
+        files["signature.sigstore.json"] = _sha256(bundle / "signature.sigstore.json")
+    manifest: dict[str, object] = {"schema_version": "bakeoff-results/v1", "files": files}
+    if signer is not None:
+        manifest["signer"] = signer
     (bundle / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return bundle
 
@@ -187,7 +185,7 @@ def test_signers_policy_is_not_looked_up_beside_the_package(tmp_path: Path, monk
     assert spec is not None and spec.loader is not None
     installed = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(installed)
-    assert Path(installed.__file__).resolve().parent == package.resolve()
+    assert Path(installed.__file__ or "").resolve().parent == package.resolve()
     assert not (package.parent / "signers.yaml").exists()
 
     monkeypatch.chdir(repo)
