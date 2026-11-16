@@ -10,6 +10,7 @@ import pytest
 from bakeoff_results.queue_store import (
     QueueStoreError,
     _under_root,
+    claim,
     enqueue,
     get_runner,
     heartbeat,
@@ -69,6 +70,23 @@ def test_enqueue_rejects_path_injection(queue_id: str) -> None:
     pending = root / "run_queue" / "pending"
     if pending.exists():
         assert list(pending.glob("*")) == []
+
+
+def test_claim_breaks_a_created_at_tie_by_queue_id() -> None:
+    root = _root()
+    stamp = "2026-11-16T00:00:00Z"
+    for queue_id in ("t-09", "t-02", "t-17"):
+        enqueue(root, {"model_id": "m", "queue_id": queue_id, "created_at": stamp})
+
+    claimed = []
+    for _ in range(3):
+        job = claim(root, "runner-1")
+        assert job is not None
+        claimed.append(job["queue_id"])
+
+    # Directory order follows creation order, so a tie that ignores the queue_id
+    # would hand out t-09 first and make claim order filesystem-dependent.
+    assert claimed == ["t-02", "t-09", "t-17"]
 
 
 def test_heartbeat_rejects_path_injection() -> None:
