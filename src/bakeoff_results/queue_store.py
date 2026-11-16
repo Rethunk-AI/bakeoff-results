@@ -295,7 +295,7 @@ def _job_eligible(item: dict[str, Any], capabilities: dict[str, Any] | None) -> 
     quantization = item.get("quantization")
     if quantization:
         raw = caps.get("quantization") or caps.get("quantizations") or []
-        # A str uses substring `in`; treat a scalar as a one-value set.
+        # A bare string would make `in` a substring test, so it counts as one value.
         if isinstance(raw, str):
             supported = [raw]
         elif isinstance(raw, list):
