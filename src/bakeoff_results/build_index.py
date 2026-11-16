@@ -358,6 +358,12 @@ def build_index(submissions_dir: Path | str, site_dir: Path | str) -> dict[str, 
         key=lambda entry: (_parse_timestamp(entry["timestamp"]), entry["run_id"]),
         reverse=True,
     )
+    newest_by_run: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        run_id = str(entry["run_id"])
+        if run_id not in newest_by_run:
+            newest_by_run[run_id] = entry
+    entries = list(newest_by_run.values())
 
     try:
         git_hash = subprocess.check_output(
@@ -526,7 +532,7 @@ def _fmt_params(v: int) -> str:
         return "0B"
     if v < 1000:
         return f"{v}B"
-    return f"{v // 1000}TB"
+    return f"{v / 1000:.1f}T"
 
 
 def render_html(payload: dict[str, Any]) -> str:
