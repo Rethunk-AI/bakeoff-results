@@ -32,6 +32,23 @@ ALLOWED_SIGNER = {
 }
 
 
+def rekor_signature() -> dict:
+    """A minimal Sigstore bundle carrying one well-formed Rekor entry."""
+    return {
+        "verificationMaterial": {
+            "tlogEntries": [
+                {
+                    "logIndex": 42,
+                    "logId": {"keyId": "c0d23d6ad406973f9559f3ba2d1ca01f84147d8f"},
+                    "integratedTime": 1700000000,
+                    "canonicalizedBody": "eyJhcGlWZXJzaW9uIjoiMC4wLjEifQ==",
+                    "inclusionPromise": {"signedEntryTimestamp": "MEUCIQDtest=="},
+                }
+            ]
+        }
+    }
+
+
 def make_bundle(
     root: Path,
     *,
@@ -58,10 +75,7 @@ def make_bundle(
 
     write_json(bundle / "result.json", result)
     (bundle / "summary.md").write_text("# Summary\n\nFixture result.\n", encoding="utf-8")
-    write_json(
-        bundle / "signature.sigstore.json",
-        {"verificationMaterial": {"transparencyLogEntries": [{"logIndex": 1}]}},
-    )
+    write_json(bundle / "signature.sigstore.json", rekor_signature())
 
     manifest = {
         "schema_version": "bakeoff-results/v1",

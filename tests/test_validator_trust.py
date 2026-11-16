@@ -1,4 +1,4 @@
-"""Regression tests for the validator's signer gate."""
+"""Regression tests for the validator's signer gate and Rekor evidence."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from bakeoff_results import validate as validate_module
 from bakeoff_results.validate import BundleValidationError, validate_bundle
 
 
@@ -68,6 +69,9 @@ def write_bundle(
 SIGNER = {
     "identity": "github-actions[bot]",
     "issuer": "https://token.actions.githubusercontent.com",
+    "repository": "Rethunk-AI/bakeoff",
+    "subject": "repo:Rethunk-AI/bakeoff:ref:refs/heads/main",
+    "workflow": ".github/workflows/package-results.yml",
 }
 
 
@@ -76,3 +80,62 @@ def test_manifest_without_signer_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(BundleValidationError, match="signer"):
         validate_bundle(bundle)
+
+
+def test_empty_verification_material_is_not_rekor_evidence(tmp_path: Path) -> None:
+    bundle = write_bundle(tmp_path, signer=SIGNER, signature={"verificationMaterial": {}})
+
+    with pytest.raises(BundleValidationError, match="Rekor"):
+        validate_bundle(bundle)
+
+
+def test_rekor_entry_missing_required_fields_is_rejected(tmp_path: Path) -> None:
+    bundle = write_bundle(
+        tmp_path,
+        signer=SIGNER,
+        signature={"verificationMaterial": {"tlogEntries": [{"logIndex": 1}]}},
+    )
+
+    with pytest.raises(BundleValidationError, match="malformed"):
+        validate_bundle(bundle)
+
+
+def test_rekor_entry_without_inclusion_proof_is_rejected(tmp_path: Path) -> None:
+    entry = rekor_signature()["verificationMaterial"]["tlogEntries"][0]
+    del entry["inclusionPromise"]
+    bundle = write_bundle(
+        tmp_path,
+        signer=SIGNER,
+        signature={"verificationMaterial": {"tlogEntries": [entry]}},
+    )
+
+    with pytest.raises(BundleValidationError, match="malformed"):
+        validate_bundle(bundle)
+
+
+def test_well_formed_rekor_entry_is_accepted(tmp_path: Path) -> None:
+    bundle = write_bundle(tmp_path, signer=SIGNER, signature=rekor_signature())
+
+    validate_bundle(bundle)
+
+
+def test_require_signature_rejects_a_bundle_without_a_signature(tmp_path: Path) -> None:
+    bundle = write_bundle(tmp_path, signer=SIGNER)
+
+    assert validate_module.main(["--require-signature", str(bundle)]) == 1
+
+
+def test_require_signature_accepts_a_well_formed_rekor_entry(tmp_path: Path) -> None:
+    bundle = write_bundle(tmp_path, signer=SIGNER, signature=rekor_signature())
+
+    assert validate_module.main(["--require-signature", str(bundle)]) == 0
+
+
+def test_ci_validate_step_requires_signatures() -> None:
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(
+        encoding="utf-8"
+    )
+    validate_steps = [line for line in workflow.splitlines() if "bakeoff_results.validate" in line]
+
+    assert validate_steps
+    assert all("--require-signature" in line for line in validate_steps)
