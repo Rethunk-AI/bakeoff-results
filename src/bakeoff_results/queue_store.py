@@ -29,6 +29,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from bakeoff_results.queue_signing import SigningError, public_key_fingerprint
+
 _PENDING = "pending"
 _COMPLETED = "completed"
 _ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"
@@ -655,10 +657,24 @@ def write_submission(
         root,
         root / "submissions" / _safe_id(runner_id, "runner_id") / _safe_id(run_id, "run_id"),
     )
+    runner = get_runner(root, runner_id)
+    if runner is None:
+        raise QueueStoreError(f"unknown runner: {runner_id}")
+    public_key = runner.get("public_key")
+    if not isinstance(public_key, str) or not public_key:
+        raise QueueStoreError(f"runner {runner_id} has no registered public key")
+    try:
+        fingerprint = public_key_fingerprint(public_key)
+    except SigningError as exc:
+        raise QueueStoreError(f"runner {runner_id} has an unusable public key") from exc
     bundle.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(dir=bundle.parent))
     try:
-        _atomic_write(root, staging / "envelope.json", envelope)
+        envelope_sha = _write_text(
+            root,
+            staging / "envelope.json",
+            json.dumps(envelope, indent=2, sort_keys=True) + "\n",
+        )
         result_path = staging / "result.json"
         _atomic_write(root, result_path, result)
         summary_sha = _write_text(
@@ -672,7 +688,17 @@ def write_submission(
             "created_at": utc_now(),
             "bundle": {"run_id": result.get("run_id"), "timestamp": result.get("timestamp")},
             "source": {"kind": "queue", "runner_id": runner_id},
+            # A queue bundle has no Sigstore identity, so the registered runner key is
+            # the signer. signers.yaml allowlists the fingerprint; the public key travels
+            # with the bundle so verification needs no roster the indexer cannot read.
+            "signer": {
+                "kind": "runner",
+                "runner_id": runner_id,
+                "fingerprint": fingerprint,
+                "public_key": public_key,
+            },
             "files": {
+                "envelope.json": {"sha256": envelope_sha},
                 "result.json": {"sha256": _sha256_bytes(result_path.read_bytes())},
                 "summary.md": {"sha256": summary_sha},
             },

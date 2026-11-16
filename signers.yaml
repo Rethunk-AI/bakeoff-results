@@ -20,3 +20,7 @@ trusted_repositories:
 trusted_identities:
   - identity: github-actions[bot]
     issuer: https://token.actions.githubusercontent.com
+# Registered queue runner keys, as "sha256:<hex>" over the raw 32-byte Ed25519 key.
+# A queue bundle signed by a fingerprint listed here needs no Sigstore identity. The
+# list is empty until an operator vets a runner, so queue bundles stay rejected.
+runners:

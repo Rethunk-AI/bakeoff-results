@@ -16,10 +16,11 @@ from urllib.request import Request, urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bakeoff_results import queue_store
+from bakeoff_results.build_index import build_index
 from bakeoff_results.queue_app import QueueSettings, dispatch
 from bakeoff_results.queue_auth import load_or_create_admin_token, load_or_create_secret
 from bakeoff_results.queue_server import make_handler
-from bakeoff_results.queue_signing import generate_keypair, sign_result
+from bakeoff_results.queue_signing import generate_keypair, public_key_fingerprint, sign_result
 from bakeoff_results.queue_store import (
     QueueStoreError,
     add_whitelist_key,
@@ -621,6 +622,22 @@ class QueueApiTests(unittest.TestCase):
             ["envelope.json", "manifest.json", "result.json", "summary.md"],
         )
         self.assertEqual(discover_bundles([self.root / "submissions"]), [bundle])
+
+        # A runner-signed bundle reaches the index only through an allowlisted fingerprint.
+        policy = Path(self.tmp.name) / "policy" / "signers.yaml"
+        policy.parent.mkdir()
+        policy.write_text(
+            "schema_version: bakeoff-results-signers/v1\n"
+            "runners:\n"
+            f"  - {public_key_fingerprint(public_key)}\n"
+        )
+        previous = os.getcwd()
+        os.chdir(policy.parent)
+        try:
+            indexed = build_index(self.root / "submissions", Path(self.tmp.name) / "site")
+        finally:
+            os.chdir(previous)
+        self.assertEqual([entry["run_id"] for entry in indexed["entries"]], ["queued"])
 
 
 class QueueAuthSecretTests(unittest.TestCase):

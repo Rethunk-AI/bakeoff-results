@@ -150,6 +150,20 @@ def _signer_allowlisted(signer: dict[str, Any], policy: dict[str, Any]) -> bool:
     return False
 
 
+def _runner_fingerprints(policy: dict[str, Any]) -> set[str]:
+    entries = policy.get("runners")
+    if entries is None:
+        return set()
+    if not isinstance(entries, list):
+        raise BundleValidationError("signers.yaml runners must be a list of fingerprints")
+    fingerprints: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, str) or not entry.strip():
+            raise BundleValidationError("signers.yaml runners entries must be fingerprint strings")
+        fingerprints.add(entry.strip())
+    return fingerprints
+
+
 def _entry_matches(signer: dict[str, Any], entry: object) -> bool:
     if not isinstance(entry, dict):
         return False
@@ -372,6 +386,71 @@ def _require_rekor_evidence(signature: dict[str, Any]) -> None:
         raise BundleValidationError("signature.sigstore.json Rekor entry is malformed")
 
 
+def _runner_signer_error(message: str) -> BundleValidationError:
+    return BundleValidationError(f"runner signer {message}")
+
+
+def _verify_runner_signer(
+    manifest: dict[str, Any],
+    signer: dict[str, Any],
+    bundle_dir: Path,
+    policy: dict[str, Any],
+) -> None:
+    """Check a queue bundle against signers.yaml `runners` and its stored envelope.
+
+    The envelope verification needs Ed25519, which is not a stdlib primitive, so the
+    import is deferred: validate.py stays importable without cryptography and fails
+    closed when the verifier is unavailable.
+    """
+    runner_id = signer.get("runner_id")
+    if not isinstance(runner_id, str) or not runner_id.strip():
+        raise _runner_signer_error("requires a runner_id")
+    fingerprint = signer.get("fingerprint")
+    if not isinstance(fingerprint, str) or not fingerprint.strip():
+        raise _runner_signer_error("requires a fingerprint")
+    if fingerprint not in _runner_fingerprints(policy):
+        raise _runner_signer_error("fingerprint is not allowlisted")
+
+    public_key = signer.get("public_key")
+    if not isinstance(public_key, str) or not public_key.strip():
+        raise _runner_signer_error("requires a public_key")
+
+    envelope_path = bundle_dir / "envelope.json"
+    if not envelope_path.is_file():
+        raise _runner_signer_error("bundle is missing envelope.json")
+    # Without its hash the envelope could be swapped for one signed over other content.
+    if "envelope.json" not in _manifest_file_hashes(manifest):
+        raise _runner_signer_error("manifest does not hash envelope.json")
+    envelope = load_json(envelope_path)
+
+    try:
+        from bakeoff_results.queue_signing import (
+            SigningError,
+            public_key_fingerprint,
+            verify_result,
+        )
+    except ImportError as exc:
+        raise BundleValidationError(
+            "runner signer verification requires the cryptography package"
+        ) from exc
+
+    try:
+        if public_key_fingerprint(public_key) != fingerprint:
+            raise _runner_signer_error("public_key does not match its fingerprint")
+        verified = verify_result(envelope, public_key)
+    except SigningError as exc:
+        raise _runner_signer_error(f"envelope failed verification: {exc}") from exc
+
+    sig = envelope.get("sig")
+    if isinstance(sig, dict) and sig.get("runner_id") not in (None, runner_id):
+        raise _runner_signer_error("envelope runner_id does not match the manifest")
+
+    # The manifest hashes result.json, so requiring the signed result to equal it
+    # extends the signature's coverage over the manifest's file hashes.
+    if verified != load_json(bundle_dir / "result.json"):
+        raise _runner_signer_error("envelope result does not match the stored result")
+
+
 def validate_signer_metadata(
     manifest: dict[str, Any],
     bundle_dir: Path,
@@ -380,6 +459,14 @@ def validate_signer_metadata(
     signer = manifest.get("signer")
     if not isinstance(signer, dict):
         raise BundleValidationError("manifest requires a signer object")
+
+    kind = signer.get("kind")
+    if kind is not None and not isinstance(kind, str):
+        raise BundleValidationError("manifest signer kind must be a string")
+
+    if kind == "runner":
+        _verify_runner_signer(manifest, signer, bundle_dir, _load_signers(signers_path))
+        return
 
     has_identity = any(
         isinstance(signer.get(field), str) and signer.get(field)
