@@ -17,6 +17,7 @@ from bakeoff_results.queue_app import QueueSettings, dispatch
 from bakeoff_results.queue_server import make_handler
 from bakeoff_results.queue_signing import generate_keypair, sign_result
 from bakeoff_results.queue_store import (
+    QueueStoreError,
     add_whitelist_key,
     claim,
     enqueue,
@@ -507,6 +508,15 @@ class QueueApiTests(unittest.TestCase):
             (self.root / "submissions" / runner_id / "same-run" / "result.json").read_text()
         )
         self.assertEqual(stored["partial_score"], 0.1)
+
+    def test_duplicate_enqueue_is_refused(self) -> None:
+        enqueue(self.root, {"model_id": "model-A", "queue_id": "dup"})
+        with self.assertRaisesRegex(QueueStoreError, "duplicate"):
+            enqueue(self.root, {"model_id": "model-B", "queue_id": "dup"})
+        self.assertEqual([job["model_id"] for job in list_pending(self.root)], ["model-A"])
+        claimed = claim(self.root, "runner-1")
+        assert claimed is not None
+        self.assertEqual(claimed["model_id"], "model-A")
 
 
 if __name__ == "__main__":

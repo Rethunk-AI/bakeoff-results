@@ -258,7 +258,10 @@ def enqueue(root: Path, item: dict[str, Any]) -> dict[str, Any]:
     out.setdefault("attempt_count", 0)
     out.setdefault("max_attempts", 5)
     out = _stamp(out)
-    _atomic_write(root, _pending_path(root, str(out["queue_id"])), out)
+    queue_id = str(out["queue_id"])
+    if _pending_path(root, queue_id).exists() or _completed_path(root, queue_id).exists():
+        raise QueueStoreError(f"duplicate queue_id: {queue_id}")
+    _atomic_write(root, _pending_path(root, queue_id), out)
     return out
 
 
