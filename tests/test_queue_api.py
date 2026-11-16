@@ -431,6 +431,37 @@ class QueueApiTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertFalse((self.root / "submissions").exists())
 
+    def test_reap_keeps_paused_and_reregister_never_clears_status(self) -> None:
+        token, runner_id = self._registered()
+        enqueue(self.root, {"model_id": "m", "run_id": "job-s", "queue_id": "job-s"})
+        self._dispatch("POST", "/api/queue/claim", {}, token=token)
+        self._dispatch(
+            "POST", f"/api/admin/runners/{runner_id}/status", {"status": "PAUSED"}, admin=True
+        )
+        job_path = self.root / "run_queue" / "pending" / "job-s.json"
+        job = json.loads(job_path.read_text())
+        job["claimed_at"] = "2000-01-01T00:00:00Z"
+        job["last_heartbeat"] = "2000-01-01T00:00:00Z"
+        job_path.write_text(json.dumps(job, indent=2, sort_keys=True) + "\n")
+        self.assertEqual(reap_stale_claims(self.root, 60), ["job-s"])
+        self.assertEqual(self._runner_status(runner_id), "PAUSED")
+
+        self._registered()
+        self.assertEqual(self._runner_status(runner_id), "PAUSED")
+        enqueue(self.root, {"model_id": "m", "run_id": "job-t", "queue_id": "job-t"})
+        status, _ = self._dispatch("POST", "/api/queue/claim", {}, token=token)
+        self.assertEqual(status, 403)
+
+        set_runner_status(self.root, runner_id, "DEAD")
+        status, registered = self._dispatch(
+            "POST", "/api/runners/register", {"public_key": self.public}
+        )
+        self.assertEqual(status, 200)
+        assert registered is not None
+        self.assertEqual(self._runner_status(runner_id), "DEAD")
+        status, _ = self._dispatch("POST", "/api/queue/claim", {}, token=registered["token"])
+        self.assertEqual(status, 403)
+
 
 if __name__ == "__main__":
     unittest.main()

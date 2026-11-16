@@ -559,7 +559,8 @@ def reap_stale_claims(root: Path, timeout_seconds: int) -> list[str]:
             reaped.append(queue_id)
         if isinstance(runner_id, str):
             runner = get_runner(root, runner_id)
-            if runner is not None:
+            # An admin's PAUSED survives the reap; only a stale IDLE/ACTIVE runner is revoked.
+            if runner is not None and runner.get("status") != RUNNER_PAUSED:
                 runner["status"] = RUNNER_DEAD
                 runner["current_claim"] = None
                 _atomic_write(root, _runner_path(root, runner_id), runner)
