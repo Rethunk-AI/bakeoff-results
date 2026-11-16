@@ -10,7 +10,14 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bakeoff_results.build_index import _fmt_score, _gpu_arch_family, _hw_tier, _score, build_index
+from bakeoff_results.build_index import (
+    _fmt_params,
+    _fmt_score,
+    _gpu_arch_family,
+    _hw_tier,
+    _score,
+    build_index,
+)
 from bakeoff_results.validate import BundleValidationError, validate_bundle
 
 
@@ -634,6 +641,31 @@ class IndexBuilderTests(unittest.TestCase):
                 [("iso-new", "2026-07-01T00:00:00Z"), ("compact-old", "20260427-010000")],
             )
 
+    def test_duplicate_run_id_publishes_newest_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_bundle(
+                root / "submissions",
+                run_id="dup-run",
+                dirname="one",
+                timestamp="2026-04-26T00:00:00Z",
+                extra_result={"partial_score": 0.5},
+            )
+            make_bundle(
+                root / "submissions",
+                run_id="dup-run",
+                dirname="two",
+                timestamp="2026-07-01T00:00:00Z",
+                extra_result={"partial_score": 0.5},
+            )
+
+            payload = build_index(root / "submissions", root / "site")
+            rows = [(e["run_id"], e["bundle_path"], e["score"]) for e in payload["entries"]]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][0], "dup-run")
+            self.assertTrue(rows[0][1].endswith("/two"))
+            self.assertEqual(rows[0][2], "0.50")
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -650,6 +682,9 @@ class HwTierAndScoreFormatTests(unittest.TestCase):
         ):
             self.assertEqual(_hw_tier({"device_name": name})[0], "GPU", name)
         self.assertEqual(_hw_tier({"device_name": "AMD EPYC 7763"})[0], "CPU")
+
+    def test_fmt_params_keeps_one_decimal_for_trillions(self) -> None:
+        self.assertEqual(_fmt_params(1500), "1.5T")
 
     def test_score_never_rounds_up_to_perfect(self) -> None:
         self.assertEqual(_fmt_score(0.996), "0.99")
