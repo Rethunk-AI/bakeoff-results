@@ -16,6 +16,15 @@ material. The local validator checks signer metadata against that allowlist and
 that transparency-log material is structurally present. CI runs full Sigstore
 bundle verification and GitHub artifact attestations for generated index artifacts.
 
+Queue submissions carry no Sigstore identity. Their signer is the Ed25519 key the
+worker registered with, recorded in the bundle manifest as `kind: runner` with the
+`runner_id`, the key's `fingerprint`, and the public key, plus the `envelope.json`
+the queue accepted. Such a bundle is valid only when that fingerprint appears in
+the `runners` section of `signers.yaml` and the stored envelope verifies against
+that key over the manifest's file hashes. Adding a runner to `runners` is therefore
+a signer-policy change and follows the same signed-commit review as any other edit
+to `signers.yaml`.
+
 ## Result States
 
 Every published run should be treated as one of these states:

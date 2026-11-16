@@ -41,6 +41,21 @@ def generate_keypair() -> tuple[Ed25519PrivateKey, str]:
     return private_key, encode_public_key(private_key.public_key())
 
 
+def public_key_fingerprint(public_key_b64: str) -> str:
+    """Fingerprint the raw 32-byte key, so the digest names exactly one key.
+
+    Hashing the base64 text instead would let a re-padded or re-encoded spelling of
+    the same key carry a different fingerprint.
+    """
+    try:
+        raw = base64.b64decode(public_key_b64, validate=True)
+    except Exception as exc:
+        raise SigningError(f"invalid public key: {exc}") from exc
+    if len(raw) != 32:
+        raise SigningError("public key is not a 32-byte Ed25519 key")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
 def sign_result(
     result: dict[str, Any],
     private_key: Ed25519PrivateKey,

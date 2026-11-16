@@ -15,6 +15,12 @@ trusted_repositories:
 trusted_identities:
   - identity: github-actions[bot]
     issuer: https://token.actions.githubusercontent.com
+# Queue-submitted bundles carry no Sigstore identity; their signer is the Ed25519 key
+# the runner registered with. Allowlist each key by its "sha256:<hex>" fingerprint,
+# computed over the raw 32-byte key, one per line:
+# runners:
+#   - sha256:0000000000000000000000000000000000000000000000000000000000000000
+runners:
 notes:
   - Replace placeholder subjects and workflows before public release.
   - Require Sigstore/Rekor verification for submitted bundles.
