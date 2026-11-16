@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -618,28 +619,73 @@ def list_completed(root: Path) -> list[dict[str, Any]]:
     return items
 
 
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _write_text(root: Path, path: Path, text: str) -> str:
+    path = _under_root(root, path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = text.encode()
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(encoded)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+    return _sha256_bytes(encoded)
+
+
 def write_submission(
     root: Path,
     runner_id: str,
     run_id: str,
     envelope: dict[str, Any],
 ) -> Path:
-    dest = _under_root(
-        root,
-        root
-        / "submissions"
-        / _safe_id(runner_id, "runner_id")
-        / _safe_id(run_id, "run_id")
-        / "envelope.json",
-    )
-    dest.parent.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        # mkdir is the mutex: the first submit for a run wins, a replay must not overwrite it.
-        dest.parent.mkdir(exist_ok=False)
-    except FileExistsError as exc:
-        raise QueueStoreError(f"submission already exists: {runner_id}/{run_id}") from exc
-    _atomic_write(root, dest, envelope)
+    """Store a signed envelope as a bundle the index can discover; never replace one."""
     result = envelope.get("result")
-    if isinstance(result, dict):
-        _atomic_write(root, dest.with_name("result.json"), result)
-    return dest.parent
+    if not isinstance(result, dict):
+        raise QueueStoreError("envelope has no result object to store")
+    bundle = _under_root(
+        root,
+        root / "submissions" / _safe_id(runner_id, "runner_id") / _safe_id(run_id, "run_id"),
+    )
+    bundle.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(dir=bundle.parent))
+    try:
+        _atomic_write(root, staging / "envelope.json", envelope)
+        result_path = staging / "result.json"
+        _atomic_write(root, result_path, result)
+        summary_sha = _write_text(
+            root,
+            staging / "summary.md",
+            f"# Run {result.get('run_id')}\n\n"
+            f"Submitted by queue runner `{runner_id}` at {utc_now()}.\n",
+        )
+        manifest = {
+            "schema_version": "bakeoff-results/v1",
+            "created_at": utc_now(),
+            "bundle": {"run_id": result.get("run_id"), "timestamp": result.get("timestamp")},
+            "source": {"kind": "queue", "runner_id": runner_id},
+            "files": {
+                "result.json": {"sha256": _sha256_bytes(result_path.read_bytes())},
+                "summary.md": {"sha256": summary_sha},
+            },
+        }
+        _atomic_write(root, staging / "manifest.json", manifest)
+        try:
+            # The rename is the mutex: the first submit for a run wins and a replay cannot
+            # leave a half-written bundle behind for discover_bundles to trip over.
+            os.rename(staging, bundle)
+        except OSError as exc:
+            raise QueueStoreError(f"submission already exists: {runner_id}/{run_id}") from exc
+    except BaseException:
+        with contextlib.suppress(OSError):
+            for leftover in staging.iterdir():
+                leftover.unlink()
+            staging.rmdir()
+        raise
+    return bundle

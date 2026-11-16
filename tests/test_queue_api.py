@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bakeoff_results import queue_store
+from bakeoff_results.build_index import build_index
 from bakeoff_results.queue_app import QueueSettings, dispatch
 from bakeoff_results.queue_auth import load_or_create_admin_token, load_or_create_secret
 from bakeoff_results.queue_server import make_handler
@@ -35,6 +36,7 @@ from bakeoff_results.queue_store import (
     set_runner_status,
     upsert_runner,
 )
+from bakeoff_results.validate import discover_bundles
 
 
 def _result(run_id: str, model_id: str = "model-a") -> dict[str, Any]:
@@ -595,6 +597,33 @@ class QueueApiTests(unittest.TestCase):
             still_pending = claim(root, "runner-2", {"vram_mb": 1000000})
             assert still_pending is not None
             self.assertEqual(still_pending["model_id"], "huge")
+
+    def test_write_submission_is_index_discoverable(self) -> None:
+        private_key, public_key = generate_keypair()
+        add_whitelist_key(self.root, public_key)
+        settings = QueueSettings(
+            data_dir=self.root, secret=b"s", admin_token="a", heartbeat_ttl_s=120
+        )
+        body = json.dumps({"public_key": public_key}).encode()
+        registered = json.loads(dispatch(settings, "POST", "/api/runners/register", {}, body).body)
+        runner_id = registered["runner"]["runner_id"]
+        headers = {"Authorization": f"Bearer {registered['token']}"}
+        enqueue(self.root, {"model_id": "m", "run_id": "queued", "queue_id": "queued"})
+        dispatch(settings, "POST", "/api/queue/claim", headers, b"{}")
+        envelope = sign_result(_result("queued"), private_key, runner_id)
+        payload = json.dumps(envelope).encode()
+        self.assertEqual(
+            dispatch(settings, "POST", "/api/queue/queued/submit", headers, payload).status, 200
+        )
+
+        bundle = self.root / "submissions" / runner_id / "queued"
+        self.assertEqual(
+            sorted(path.name for path in bundle.iterdir()),
+            ["envelope.json", "manifest.json", "result.json", "summary.md"],
+        )
+        self.assertEqual(discover_bundles([self.root / "submissions"]), [bundle])
+        index = build_index(self.root / "submissions", self.root / "site")
+        self.assertEqual([entry["run_id"] for entry in index["entries"]], ["queued"])
 
 
 class QueueAuthSecretTests(unittest.TestCase):
