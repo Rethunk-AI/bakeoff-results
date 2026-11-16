@@ -343,6 +343,23 @@ class BundleValidationTests(unittest.TestCase):
 
             self.assertEqual(validated.result["run_id"], "test-run")
 
+    def test_non_finite_score_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = make_bundle(
+                Path(tmp),
+                extra_result={
+                    "model_scores": [
+                        {
+                            "model_id": "m_a",
+                            "status": "incomplete",
+                            "partial_score": 1e400,
+                        }
+                    ],
+                },
+            )
+            with self.assertRaisesRegex(BundleValidationError, "finite"):
+                validate_bundle(bundle)
+
 
 class IndexBuilderTests(unittest.TestCase):
     def test_index_outputs_json_and_html(self) -> None:
