@@ -374,7 +374,9 @@ def _hw_tier(hw: str | dict) -> tuple[str, int]:
     """Classify hardware into tier + vram_mb (for range filtering)."""
     if not isinstance(hw, dict):
         return ("unknown", -1)
-    name = hw.get("device_name", "")
+    name = hw.get("device_name")
+    if not isinstance(name, str):
+        name = ""
     vram = hw.get("vram_gb")
     # GPU detection
     gpu_keywords = (
@@ -398,7 +400,9 @@ def _hw_tier(hw: str | dict) -> tuple[str, int]:
         "M60",
         "M61",
     )
-    if any(k in name.upper() for k in gpu_keywords) or _GPU_NAME_RE.search(name):
+    if not name:
+        tier = "unknown"
+    elif any(k in name.upper() for k in gpu_keywords) or _GPU_NAME_RE.search(name):
         tier = "GPU"
     elif "TPU" in name.upper() or "Tensor Processing Unit" in name:
         tier = "TPU"
@@ -421,8 +425,12 @@ def _gpu_arch_family(hw: str | dict) -> str:
     """Extract GPU architecture family from hardware data."""
     if not isinstance(hw, dict):
         return "unknown"
-    name = hw.get("device_name", "")
-    pci = hw.get("device_pci", "")
+    name = hw.get("device_name")
+    pci = hw.get("device_pci")
+    if not isinstance(name, str):
+        name = ""
+    if not isinstance(pci, str):
+        pci = ""
     # PCI ID mapping for known families
     pci_map = {
         # NVIDIA
@@ -464,7 +472,7 @@ def _hw_cell_html(hw: Any) -> str:
     pci = hw.get("device_pci")
     if pci:
         parts.append(f"PCI {html.escape(str(pci))}")
-    return " · ".join(parts) if parts else html.escape(str(hw))
+    return " · ".join(parts) if parts else "unknown"
 
 
 def _params_snap_points(entries: list[dict[str, Any]]) -> list[int]:
