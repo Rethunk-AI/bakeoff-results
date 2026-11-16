@@ -18,6 +18,16 @@ class AuthError(ValueError):
     """Raised when a runner or admin token is missing or invalid."""
 
 
+def _write_private(path: Path, data: bytes) -> None:
+    """Create *path* 0600 from the first byte so it is never briefly world-readable."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        os.write(fd, data)
+    finally:
+        os.close(fd)
+
+
 def load_or_create_secret(root: Path | None = None) -> bytes:
     """Return the HMAC secret, creating a persistent one in *root* when unset."""
     env = os.environ.get("BAKEOFF_QUEUE_SECRET")
@@ -29,8 +39,7 @@ def load_or_create_secret(root: Path | None = None) -> bytes:
     if path.is_file():
         return path.read_bytes().strip()
     secret = secrets.token_bytes(32)
-    path.write_bytes(secret)
-    path.chmod(0o600)
+    _write_private(path, secret)
     return secret
 
 
@@ -44,8 +53,7 @@ def load_or_create_admin_token(root: Path | None = None) -> str:
     if path.is_file():
         return path.read_text(encoding="utf-8").strip()
     token = secrets.token_urlsafe(32)
-    path.write_text(token + "\n", encoding="utf-8")
-    path.chmod(0o600)
+    _write_private(path, (token + "\n").encode())
     return token
 
 
