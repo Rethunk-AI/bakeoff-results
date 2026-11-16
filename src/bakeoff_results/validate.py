@@ -123,34 +123,43 @@ def _issuer_matches(signer: dict[str, Any], allowed_issuer: object) -> bool:
     return signer.get("issuer") == allowed_issuer
 
 
-def _signer_allowlisted(signer: dict[str, Any], policy: dict[str, Any]) -> bool:
-    identities = policy.get("trusted_identities")
-    if isinstance(identities, list):
-        for entry in identities:
-            if not isinstance(entry, dict):
-                continue
-            allowed_id = entry.get("identity")
-            if (
-                isinstance(allowed_id, str)
-                and signer.get("identity") == allowed_id
-                and _issuer_matches(signer, entry.get("issuer"))
-            ):
-                return True
+def _workflow_matches(signer: dict[str, Any], entry: dict[str, Any]) -> bool:
+    workflows = entry.get("workflows")
+    if isinstance(workflows, list) and workflows:
+        return signer.get("workflow") in workflows
+    return True
 
-    repositories = policy.get("trusted_repositories")
-    if isinstance(repositories, list):
-        for entry in repositories:
-            if not isinstance(entry, dict):
-                continue
-            if not _issuer_matches(signer, entry.get("issuer")):
-                continue
-            allowed_repo = entry.get("repository")
-            if isinstance(allowed_repo, str) and signer.get("repository") == allowed_repo:
-                return True
-            subjects = entry.get("subjects")
-            if isinstance(subjects, list) and signer.get("subject") in subjects:
+
+def _signer_allowlisted(signer: dict[str, Any], policy: dict[str, Any]) -> bool:
+    # An entry authorizes a signer only when the signer asserts the entry's
+    # repository and one of its subjects, plus its identity and workflow when
+    # listed. An entry that binds neither repository nor subject would let any
+    # repository borrow an allowlisted identity, so it matches nothing.
+    for section in ("trusted_repositories", "trusted_identities"):
+        entries = policy.get(section)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if _entry_matches(signer, entry):
                 return True
     return False
+
+
+def _entry_matches(signer: dict[str, Any], entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    if not _issuer_matches(signer, entry.get("issuer")):
+        return False
+    allowed_repo = entry.get("repository")
+    if not isinstance(allowed_repo, str) or signer.get("repository") != allowed_repo:
+        return False
+    subjects = entry.get("subjects")
+    if not isinstance(subjects, list) or signer.get("subject") not in subjects:
+        return False
+    allowed_identity = entry.get("identity")
+    if allowed_identity is not None and signer.get("identity") != allowed_identity:
+        return False
+    return _workflow_matches(signer, entry)
 
 
 @dataclass(frozen=True)

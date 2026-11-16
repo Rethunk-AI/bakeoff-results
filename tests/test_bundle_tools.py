@@ -22,6 +22,16 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+ALLOWED_SIGNER = {
+    "identity": "github-actions[bot]",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "repository": "Rethunk-AI/bakeoff",
+    "subject": "repo:Rethunk-AI/bakeoff:ref:refs/heads/main",
+    "workflow": ".github/workflows/package-results.yml",
+    "policy": "bakeoff-results-signers/v1",
+}
+
+
 def make_bundle(
     root: Path,
     *,
@@ -59,12 +69,7 @@ def make_bundle(
             "run_id": "run-001",
             "timestamp": "2026-04-26T00:00:00Z",
         },
-        "signer": {
-            "identity": "github-actions[bot]",
-            "issuer": "https://token.actions.githubusercontent.com",
-            "repository": "Rethunk-AI/bakeoff",
-            "policy": "bakeoff-results-signers/v1",
-        },
+        "signer": dict(ALLOWED_SIGNER),
         "files": {
             "result.json": {"sha256": digest(bundle / "result.json")},
             "summary.md": {"sha256": digest(bundle / "summary.md")},
@@ -136,6 +141,7 @@ def make_bakeoff_bundle(root: Path) -> Path:
             "signed_file": "result.json",
             "required": False,
         },
+        "signer": dict(ALLOWED_SIGNER),
     }
     write_json(bundle / "manifest.json", manifest)
     return bundle
@@ -281,6 +287,7 @@ def make_post23_bundle(root: Path) -> Path:
             "signed_file": "result.json",
             "required": False,
         },
+        "signer": dict(ALLOWED_SIGNER),
     }
     write_json(bundle / "manifest.json", manifest)
     return bundle
@@ -558,6 +565,7 @@ class IndexBuilderTests(unittest.TestCase):
                     "signed_file": "result.json",
                     "required": False,
                 },
+                "signer": dict(ALLOWED_SIGNER),
             }
             write_json(bundle / "manifest.json", manifest)
 
