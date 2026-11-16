@@ -10,7 +10,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bakeoff_results.build_index import _fmt_score, _hw_tier, build_index
+from bakeoff_results.build_index import _fmt_score, _gpu_arch_family, _hw_tier, build_index
 from bakeoff_results.validate import BundleValidationError, validate_bundle
 
 
@@ -615,3 +615,29 @@ class HwTierAndScoreFormatTests(unittest.TestCase):
         self.assertEqual(_fmt_score(0.29), "0.29")
         self.assertEqual(_fmt_score(1.0), "1.00")
         self.assertEqual(_fmt_score(0), "0.00")
+
+    def test_null_hardware_fields_do_not_crash_index(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_bundle(
+                root / "submissions",
+                extra_result={
+                    "hardware": {"device_name": "Radeon 8060S", "device_pci": None},
+                },
+            )
+            payload = build_index(root / "submissions", root / "site")
+            self.assertEqual(len(payload["entries"]), 1)
+            self.assertTrue((root / "site" / "index.json").is_file())
+            self.assertEqual(_gpu_arch_family(payload["entries"][0]["hardware"]), "AMD")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_bundle(
+                root / "submissions",
+                extra_result={"hardware": {"device_name": None}},
+            )
+            payload = build_index(root / "submissions", root / "site")
+            self.assertEqual(len(payload["entries"]), 1)
+            self.assertTrue((root / "site" / "index.json").is_file())
+            self.assertEqual(_gpu_arch_family(payload["entries"][0]["hardware"]), "unknown")
+            self.assertEqual(_hw_tier(payload["entries"][0]["hardware"])[0], "unknown")
