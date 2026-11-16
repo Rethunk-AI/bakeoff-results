@@ -38,6 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           install-args: --locked
+          run-audit: "true"
 
       - name: Verify signers.yaml commit signature
         run: PYTHONPATH=src uv run python -m bakeoff_results.signers_commit
@@ -150,3 +151,19 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+
+  # One required check for branch protection to point at.
+  all-checks:
+    if: always()
+    needs: [verify, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any check did not succeed
+        run: |
+          if [ "${{ needs.verify.result }}" != "success" ] \
+            || [ "${{ needs.publish.result }}" != "success" ]; then
+            echo "verify=${{ needs.verify.result }} publish=${{ needs.publish.result }}"
+            exit 1
+          fi
+          echo "all checks passed"

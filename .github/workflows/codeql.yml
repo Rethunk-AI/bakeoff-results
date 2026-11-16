@@ -50,3 +50,18 @@ jobs:
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:${{ matrix.language }}
+
+  # One required check for branch protection to point at.
+  all-checks:
+    if: always()
+    needs: [analyze]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any check did not succeed
+        run: |
+          if [ "${{ needs.analyze.result }}" != "success" ]; then
+            echo "analyze=${{ needs.analyze.result }}"
+            exit 1
+          fi
+          echo "all checks passed"
