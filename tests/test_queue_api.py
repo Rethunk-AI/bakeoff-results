@@ -21,6 +21,7 @@ from bakeoff_results.queue_store import (
     claim,
     enqueue,
     fail,
+    get_runner,
     list_pending,
     reap_stale_claims,
     set_runner_status,
@@ -395,6 +396,40 @@ class QueueApiTests(unittest.TestCase):
         finally:
             httpd.shutdown()
             httpd.server_close()
+
+    def test_register_cannot_hijack_another_runner_id(self) -> None:
+        _, registered = self._dispatch(
+            "POST", "/api/runners/register", {"public_key": self.public, "hostname": "victim"}
+        )
+        assert registered is not None
+        runner_id = registered["runner"]["runner_id"]
+        attacker_private, attacker_public = generate_keypair()
+        add_whitelist_key(self.root, attacker_public)
+        enqueue(self.root, {"model_id": "m", "run_id": "job-v", "queue_id": "job-v"})
+        self._dispatch("POST", "/api/queue/claim", {}, token=registered["token"])
+
+        status, data = self._dispatch(
+            "POST",
+            "/api/runners/register",
+            {"public_key": attacker_public, "runner_id": runner_id},
+        )
+        self.assertEqual(status, 403)
+        assert data is not None
+        self.assertIn("public key", data["error"])
+        stored = get_runner(self.root, runner_id)
+        assert stored is not None
+        self.assertEqual(stored["public_key"], self.public)
+
+        # The attacker's own key still registers under its own id, but holds no claim.
+        status, own = self._dispatch(
+            "POST", "/api/runners/register", {"public_key": attacker_public}
+        )
+        self.assertEqual(status, 200)
+        assert own is not None
+        envelope = sign_result(_result("job-v"), attacker_private, own["runner"]["runner_id"])
+        status, _ = self._dispatch("POST", "/api/queue/job-v/submit", envelope, token=own["token"])
+        self.assertEqual(status, 400)
+        self.assertFalse((self.root / "submissions").exists())
 
 
 if __name__ == "__main__":
