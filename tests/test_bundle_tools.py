@@ -10,7 +10,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bakeoff_results.build_index import _fmt_score, _gpu_arch_family, _hw_tier, build_index
+from bakeoff_results.build_index import _fmt_score, _gpu_arch_family, _hw_tier, _score, build_index
 from bakeoff_results.validate import BundleValidationError, validate_bundle
 
 
@@ -615,6 +615,12 @@ class HwTierAndScoreFormatTests(unittest.TestCase):
         self.assertEqual(_fmt_score(0.29), "0.29")
         self.assertEqual(_fmt_score(1.0), "1.00")
         self.assertEqual(_fmt_score(0), "0.00")
+
+    def test_legacy_score_truncates_to_two_decimals(self) -> None:
+        self.assertEqual(_fmt_score(0.9999999), "0.99")
+        self.assertEqual(_score({"partial_score": 0.9999999}), "0.99")
+        self.assertEqual(_score({"partial_score": 0.123456789}), "0.12")
+        self.assertEqual(_score({"score": 0.9999999}), "0.99")
 
     def test_null_hardware_fields_do_not_crash_index(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

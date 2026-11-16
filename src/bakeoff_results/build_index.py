@@ -276,9 +276,12 @@ def _score(result: dict[str, Any], manifest: dict[str, Any] | None = None) -> st
         if isinstance(value, bool):
             continue
         if isinstance(value, (int, float)):
-            return f"{value:g}"
+            return _fmt_score(value)
         if isinstance(value, str) and value.strip():
-            return value.strip()
+            try:
+                return _fmt_score(float(value.strip()))
+            except ValueError:
+                return value.strip()
     return None
 
 
