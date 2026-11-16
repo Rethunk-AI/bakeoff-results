@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import sys
 import tempfile
 import threading
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bakeoff_results import queue_store
 from bakeoff_results.queue_app import QueueSettings, dispatch
+from bakeoff_results.queue_auth import load_or_create_admin_token, load_or_create_secret
 from bakeoff_results.queue_server import make_handler
 from bakeoff_results.queue_signing import generate_keypair, sign_result
 from bakeoff_results.queue_store import (
@@ -593,6 +595,39 @@ class QueueApiTests(unittest.TestCase):
             still_pending = claim(root, "runner-2", {"vram_mb": 1000000})
             assert still_pending is not None
             self.assertEqual(still_pending["model_id"], "huge")
+
+
+class QueueAuthSecretTests(unittest.TestCase):
+    def test_secrets_are_created_private_from_the_first_byte(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            created: dict[str, int] = {}
+            real_open = os.open
+            watched = {"queue_secret", "admin_token"}
+
+            def spying_open(path, flags, mode=0o777, *args, **kwargs):
+                fd = real_open(path, flags, mode, *args, **kwargs)
+                name = Path(path).name
+                if name in watched and flags & os.O_CREAT:
+                    created[name] = stat.S_IMODE(os.fstat(fd).st_mode)
+                return fd
+
+            env = {
+                key: value
+                for key, value in os.environ.items()
+                if key not in {"BAKEOFF_QUEUE_SECRET", "BAKEOFF_QUEUE_ADMIN_TOKEN"}
+            }
+            with (
+                mock.patch.dict(os.environ, env, clear=True),
+                mock.patch("os.open", spying_open),
+            ):
+                load_or_create_secret(root)
+                load_or_create_admin_token(root)
+
+            # Both files must be born 0600: a chmod afterwards leaves a readable window.
+            self.assertEqual(created, {"queue_secret": 0o600, "admin_token": 0o600})
+            for name in ("queue_secret", "admin_token"):
+                self.assertEqual(stat.S_IMODE((root / name).stat().st_mode), 0o600, name)
 
 
 if __name__ == "__main__":
