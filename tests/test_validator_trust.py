@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 from bakeoff_results import validate as validate_module
-from bakeoff_results.validate import BundleValidationError, validate_bundle
+from bakeoff_results.validate import (
+    BundleValidationError,
+    validate_bundle,
+    validate_result,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -129,6 +133,30 @@ def test_require_signature_accepts_a_well_formed_rekor_entry(tmp_path: Path) -> 
     bundle = write_bundle(tmp_path, signer=SIGNER, signature=rekor_signature())
 
     assert validate_module.main(["--require-signature", str(bundle)]) == 0
+
+
+def test_empty_model_ids_is_rejected() -> None:
+    result = {
+        "run_id": "run-1",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "provenance": {"source_repository": "Rethunk-AI/bakeoff", "source_commit": "abc123"},
+        "model_ids": [],
+    }
+
+    with pytest.raises(BundleValidationError, match="model_ids"):
+        validate_result(result)
+
+
+def test_non_string_model_ids_is_rejected() -> None:
+    result = {
+        "run_id": "run-1",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "provenance": {"source_repository": "Rethunk-AI/bakeoff", "source_commit": "abc123"},
+        "model_ids": [123],
+    }
+
+    with pytest.raises(BundleValidationError, match="model_ids"):
+        validate_result(result)
 
 
 def test_ci_validate_step_requires_signatures() -> None:
