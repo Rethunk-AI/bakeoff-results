@@ -197,7 +197,7 @@ def _register(settings: QueueSettings, payload: dict[str, Any]) -> AppResponse:
     existing = get_runner(settings.data_dir, runner_id)
     if existing is not None and existing.get("public_key") != public_key:
         return _error(403, "runner_id is owned by another public key")
-    paused = existing is not None and existing.get("status") == "PAUSED"
+    # An existing runner keeps its admin-set status: only an admin call clears PAUSED or DEAD.
     runner = upsert_runner(
         settings.data_dir,
         {
@@ -208,7 +208,7 @@ def _register(settings: QueueSettings, payload: dict[str, Any]) -> AppResponse:
             "effective_user": payload.get("effective_user"),
             "description": payload.get("description"),
             "capabilities": capabilities or {},
-            "status": "PAUSED" if paused else "IDLE",
+            "status": "IDLE" if existing is None else existing.get("status", "IDLE"),
         },
     )
     token, exp = mint_token(settings.secret, runner_id, settings.token_ttl_s)
