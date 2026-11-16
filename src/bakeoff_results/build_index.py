@@ -303,6 +303,21 @@ def _model_scores_detail(result: dict[str, Any], manifest: dict[str, Any]) -> li
     ]
 
 
+def _parse_timestamp(value: object) -> datetime:
+    """Parse harness compact timestamps and ISO-8601 so newest-first sort is chronological."""
+    if not isinstance(value, str) or not value:
+        return datetime.min.replace(tzinfo=UTC)
+    if re.fullmatch(r"\d{8}-\d{6}", value):
+        return datetime.strptime(value, "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=UTC)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed
+
+
 def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
     result = bundle.result
     entry = {
@@ -340,7 +355,7 @@ def build_index(submissions_dir: Path | str, site_dir: Path | str) -> dict[str, 
     bundles = [validate_bundle(path) for path in discover_bundles([submissions_path])]
     entries = sorted(
         (index_entry(bundle) for bundle in bundles),
-        key=lambda entry: (entry["timestamp"], entry["run_id"]),
+        key=lambda entry: (_parse_timestamp(entry["timestamp"]), entry["run_id"]),
         reverse=True,
     )
 

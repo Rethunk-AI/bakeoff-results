@@ -54,13 +54,16 @@ def make_bundle(
     *,
     include_required_result_fields: bool = True,
     extra_result: dict | None = None,
+    run_id: str = "run-001",
+    timestamp: str = "2026-04-26T00:00:00Z",
+    dirname: str | None = None,
 ) -> Path:
-    bundle = root / "publisher" / "run-001"
+    bundle = root / "publisher" / (dirname or run_id)
     bundle.mkdir(parents=True)
 
     result: dict[str, Any] = {
-        "run_id": "run-001",
-        "timestamp": "2026-04-26T00:00:00Z",
+        "run_id": run_id,
+        "timestamp": timestamp,
         "judge": {"mode": "static-fixture"},
         "config": {"hash": "config-sha256"},
     }
@@ -80,8 +83,8 @@ def make_bundle(
     manifest = {
         "schema_version": "bakeoff-results/v1",
         "bundle": {
-            "run_id": "run-001",
-            "timestamp": "2026-04-26T00:00:00Z",
+            "run_id": run_id,
+            "timestamp": timestamp,
         },
         "signer": dict(ALLOWED_SIGNER),
         "files": {
@@ -592,6 +595,27 @@ class IndexBuilderTests(unittest.TestCase):
             # model_scores_detail populated from manifest fallback
             self.assertEqual(len(entry["model_scores_detail"]), 1)
             self.assertEqual(entry["model_scores_detail"][0]["dominant_failure_code"], "timeout")
+
+    def test_entries_sort_by_parsed_timestamp_newest_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_bundle(
+                root / "submissions",
+                run_id="compact-old",
+                timestamp="20260427-010000",
+            )
+            make_bundle(
+                root / "submissions",
+                run_id="iso-new",
+                timestamp="2026-07-01T00:00:00Z",
+            )
+
+            payload = build_index(root / "submissions", root / "site")
+            ordered = [(e["run_id"], e["timestamp"]) for e in payload["entries"]]
+            self.assertEqual(
+                ordered,
+                [("iso-new", "2026-07-01T00:00:00Z"), ("compact-old", "20260427-010000")],
+            )
 
 
 if __name__ == "__main__":
