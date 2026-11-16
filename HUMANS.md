@@ -58,7 +58,7 @@ retries with backoff until `max_attempts`, then marks the job `FAILED`.
 ```sh
 uv sync
 python -m compileall src tests
-PYTHONPATH=src uv run python -m unittest discover -s tests
+uv run pytest
 ```
 
 ## Verify published site
