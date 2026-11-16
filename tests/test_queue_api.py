@@ -74,6 +74,18 @@ class QueueStoreTests(unittest.TestCase):
         claimed = claim(self.root, "runner-1", {"vram_mb": 24576})
         self.assertIsNotNone(claimed)
 
+    def test_string_quantization_cap_is_exact_match(self) -> None:
+        caps = {"quantization": "q4_k_m"}
+        self.assertFalse(queue_store._job_eligible({"quantization": "q4"}, caps))
+        self.assertFalse(queue_store._job_eligible({"quantization": "k_m"}, caps))
+        self.assertTrue(queue_store._job_eligible({"quantization": "q4_k_m"}, caps))
+
+    def test_list_quantization_cap_is_membership(self) -> None:
+        caps = {"quantization": ["q4_k_m", "fp16"]}
+        self.assertTrue(queue_store._job_eligible({"quantization": "q4_k_m"}, caps))
+        self.assertTrue(queue_store._job_eligible({"quantization": "fp16"}, caps))
+        self.assertFalse(queue_store._job_eligible({"quantization": "q4"}, caps))
+
     def test_concurrent_claim_has_one_winner(self) -> None:
         enqueue(self.root, {"model_id": "only"})
         winners: list[str] = []

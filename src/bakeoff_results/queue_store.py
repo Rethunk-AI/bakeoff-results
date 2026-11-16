@@ -294,7 +294,14 @@ def _job_eligible(item: dict[str, Any], capabilities: dict[str, Any] | None) -> 
             return False
     quantization = item.get("quantization")
     if quantization:
-        supported = caps.get("quantization") or caps.get("quantizations") or []
+        raw = caps.get("quantization") or caps.get("quantizations") or []
+        # A str uses substring `in`; treat a scalar as a one-value set.
+        if isinstance(raw, str):
+            supported = [raw]
+        elif isinstance(raw, list):
+            supported = raw
+        else:
+            return False
         if supported and quantization not in supported:
             return False
     return True
