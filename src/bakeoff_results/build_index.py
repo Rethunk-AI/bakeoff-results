@@ -310,7 +310,7 @@ def _parse_timestamp(value: object) -> datetime:
     if re.fullmatch(r"\d{8}-\d{6}", value):
         return datetime.strptime(value, "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return datetime.min.replace(tzinfo=UTC)
     if parsed.tzinfo is None:
