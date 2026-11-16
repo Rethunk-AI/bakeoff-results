@@ -327,7 +327,10 @@ def _submit(
     if isinstance(sig, dict) and sig.get("runner_id") not in {None, runner_id}:
         return _error(400, "envelope runner_id does not match bearer")
     validate_result(result)
-    assert_claimed(settings.data_dir, job_id, runner_id)
-    dest = write_submission(settings.data_dir, runner_id, str(result["run_id"]), envelope)
+    job = assert_claimed(settings.data_dir, job_id, runner_id)
+    expected_run_id = str(job.get("run_id") or job.get("queue_id") or job_id)
+    if str(result["run_id"]) != expected_run_id:
+        return _error(400, "envelope run_id does not match the claimed job")
+    dest = write_submission(settings.data_dir, runner_id, expected_run_id, envelope)
     job = complete(settings.data_dir, job_id, runner_id)
     return _json(200, {"job": job, "stored": str(dest)})

@@ -283,12 +283,13 @@ def _settle_status(runner: dict[str, Any], status: str) -> None:
         runner["status"] = status
 
 
-def assert_claimed(root: Path, job_id: str, runner_id: str) -> None:
+def assert_claimed(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
     found = _lookup_pending(root, job_id)
     if found is None:
         raise QueueStoreError(f"unknown in-flight job: {job_id}")
     if found[1].get("claimed_by") != runner_id:
         raise QueueStoreError("job is not claimed by this runner")
+    return found[1]
 
 
 def _lookup_pending(root: Path, job_id: str) -> tuple[Path, dict[str, Any]] | None:
@@ -597,6 +598,12 @@ def write_submission(
         / _safe_id(run_id, "run_id")
         / "envelope.json",
     )
+    dest.parent.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        # mkdir is the mutex: the first submit for a run wins, a replay must not overwrite it.
+        dest.parent.mkdir(exist_ok=False)
+    except FileExistsError as exc:
+        raise QueueStoreError(f"submission already exists: {runner_id}/{run_id}") from exc
     _atomic_write(root, dest, envelope)
     result = envelope.get("result")
     if isinstance(result, dict):
