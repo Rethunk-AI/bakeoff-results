@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,8 @@ from bakeoff_results.validate import (
     validate_bundle,
     validate_result,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _sha256(path: Path) -> str:
@@ -157,6 +161,51 @@ def test_non_string_model_ids_is_rejected() -> None:
 
     with pytest.raises(BundleValidationError, match="model_ids"):
         validate_result(result)
+
+
+def test_signers_policy_is_found_from_the_working_directory(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "checkout"
+    repo.mkdir()
+    shutil.copy(REPO_ROOT / "signers.yaml", repo / "signers.yaml")
+    bundle = write_bundle(tmp_path, signer=SIGNER, signature=rekor_signature())
+
+    monkeypatch.chdir(repo)
+    validate_bundle(bundle)
+
+
+def test_signers_policy_is_not_looked_up_beside_the_package(tmp_path: Path, monkeypatch) -> None:
+    # An installed layout has no signers.yaml next to site-packages, so the
+    # policy has to come from the repo root rather than the package directory.
+    package = tmp_path / "lib" / "site-packages" / "bakeoff_results"
+    shutil.copytree(REPO_ROOT / "src" / "bakeoff_results", package)
+    repo = tmp_path / "checkout"
+    repo.mkdir()
+    shutil.copy(REPO_ROOT / "signers.yaml", repo / "signers.yaml")
+    bundle = write_bundle(tmp_path, signer=SIGNER, signature=rekor_signature())
+
+    spec = importlib.util.spec_from_file_location("installed_validate", package / "validate.py")
+    assert spec is not None and spec.loader is not None
+    installed = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(installed)
+    assert Path(installed.__file__).resolve().parent == package.resolve()
+    assert not (package.parent / "signers.yaml").exists()
+
+    monkeypatch.chdir(repo)
+    installed.validate_bundle(bundle)
+
+
+def test_explicit_signers_path_wins_over_the_working_directory(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "checkout"
+    repo.mkdir()
+    policy = tmp_path / "policy" / "signers.yaml"
+    policy.parent.mkdir()
+    shutil.copy(REPO_ROOT / "signers.yaml", policy)
+    bundle = write_bundle(tmp_path, signer=SIGNER, signature=rekor_signature())
+
+    monkeypatch.chdir(repo)
+    assert not (repo / "signers.yaml").exists()
+
+    validate_bundle(bundle, policy)
 
 
 def test_ci_validate_step_requires_signatures() -> None:
