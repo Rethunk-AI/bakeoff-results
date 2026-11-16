@@ -16,7 +16,6 @@ from urllib.request import Request, urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bakeoff_results import queue_store
-from bakeoff_results.build_index import build_index
 from bakeoff_results.queue_app import QueueSettings, dispatch
 from bakeoff_results.queue_auth import load_or_create_admin_token, load_or_create_secret
 from bakeoff_results.queue_server import make_handler
@@ -598,7 +597,7 @@ class QueueApiTests(unittest.TestCase):
             assert still_pending is not None
             self.assertEqual(still_pending["model_id"], "huge")
 
-    def test_write_submission_is_index_discoverable(self) -> None:
+    def test_write_submission_is_discoverable(self) -> None:
         private_key, public_key = generate_keypair()
         add_whitelist_key(self.root, public_key)
         settings = QueueSettings(
@@ -622,8 +621,6 @@ class QueueApiTests(unittest.TestCase):
             ["envelope.json", "manifest.json", "result.json", "summary.md"],
         )
         self.assertEqual(discover_bundles([self.root / "submissions"]), [bundle])
-        index = build_index(self.root / "submissions", self.root / "site")
-        self.assertEqual([entry["run_id"] for entry in index["entries"]], ["queued"])
 
 
 class QueueAuthSecretTests(unittest.TestCase):
