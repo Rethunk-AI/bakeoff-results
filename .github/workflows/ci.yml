@@ -61,7 +61,7 @@ jobs:
         run: uv run python -m compileall src tests
 
       - name: Run tests
-        run: PYTHONPATH=src uv run python -m unittest discover -s tests
+        run: uv run pytest
 
       - name: Validate submissions
         run: PYTHONPATH=src uv run python -m bakeoff_results.validate --scan --allow-empty submissions
