@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -184,6 +185,9 @@ def test_signers_policy_is_not_looked_up_beside_the_package(tmp_path: Path, monk
     spec = importlib.util.spec_from_file_location("installed_validate", package / "validate.py")
     assert spec is not None and spec.loader is not None
     installed = importlib.util.module_from_spec(spec)
+    # dataclasses resolves string annotations through sys.modules[cls.__module__], which
+    # this module is not registered in unless we put it there ourselves.
+    monkeypatch.setitem(sys.modules, spec.name, installed)
     spec.loader.exec_module(installed)
     assert Path(installed.__file__ or "").resolve().parent == package.resolve()
     assert not (package.parent / "signers.yaml").exists()
