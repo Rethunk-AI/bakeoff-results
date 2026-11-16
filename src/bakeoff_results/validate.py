@@ -297,6 +297,58 @@ def validate_result(result: dict[str, Any]) -> None:
     _model_ids(result)
 
 
+_REKOR_ENTRY_KEYS = ("tlogEntries", "transparencyLogEntries", "rekor")
+
+
+def _rekor_entries(signature: dict[str, Any]) -> list[Any]:
+    material = signature.get("verificationMaterial")
+    for container in (material, signature):
+        if not isinstance(container, dict):
+            continue
+        for key in _REKOR_ENTRY_KEYS:
+            entries = container.get(key)
+            if isinstance(entries, list):
+                return entries
+    return []
+
+
+def _rekor_entry_well_formed(entry: object) -> bool:
+    """Require the fields a real Rekor log entry always carries."""
+    if not isinstance(entry, dict):
+        return False
+    log_index = entry.get("logIndex")
+    if not isinstance(log_index, int) or isinstance(log_index, bool) or log_index < 0:
+        return False
+    log_id = entry.get("logId")
+    if not isinstance(log_id, dict) or not isinstance(log_id.get("keyId"), str):
+        return False
+    if not log_id["keyId"]:
+        return False
+    integrated_time = entry.get("integratedTime")
+    if not isinstance(integrated_time, int) or isinstance(integrated_time, bool):
+        return False
+    body = entry.get("canonicalizedBody")
+    if not isinstance(body, str) or not body:
+        return False
+    # An entry is only useful for verification when it carries a signed
+    # timestamp or an inclusion proof checkpoint.
+    promise = entry.get("inclusionPromise")
+    if isinstance(promise, dict) and promise.get("signedEntryTimestamp"):
+        return True
+    proof = entry.get("inclusionProof")
+    return isinstance(proof, dict) and bool(proof.get("checkpoint"))
+
+
+def _require_rekor_evidence(signature: dict[str, Any]) -> None:
+    entries = _rekor_entries(signature)
+    if not entries:
+        raise BundleValidationError(
+            "signature.sigstore.json must include a Rekor transparency log entry"
+        )
+    if not all(_rekor_entry_well_formed(entry) for entry in entries):
+        raise BundleValidationError("signature.sigstore.json Rekor entry is malformed")
+
+
 def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None:
     signer = manifest.get("signer")
     if not isinstance(signer, dict):
@@ -322,14 +374,7 @@ def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None
 
     signature_path = bundle_dir / "signature.sigstore.json"
     if signature_path.exists():
-        signature = load_json(signature_path)
-        has_rekor_evidence = any(
-            key in signature for key in ("rekor", "transparencyLogEntries", "verificationMaterial")
-        )
-        if not has_rekor_evidence:
-            raise BundleValidationError(
-                "signature.sigstore.json must include Rekor or verification material"
-            )
+        _require_rekor_evidence(load_json(signature_path))
 
 
 def validate_bundle(bundle_dir: Path | str) -> ValidatedBundle:
