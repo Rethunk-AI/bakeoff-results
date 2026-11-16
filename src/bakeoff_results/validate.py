@@ -290,10 +290,8 @@ def validate_result(result: dict[str, Any]) -> None:
 
 def validate_signer_metadata(manifest: dict[str, Any], bundle_dir: Path) -> None:
     signer = manifest.get("signer")
-    if signer is None:
-        return
     if not isinstance(signer, dict):
-        raise BundleValidationError("manifest signer must be an object when present")
+        raise BundleValidationError("manifest requires a signer object")
 
     has_identity = any(
         isinstance(signer.get(field), str) and signer.get(field)
