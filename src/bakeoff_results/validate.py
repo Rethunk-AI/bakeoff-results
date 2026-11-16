@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
 from collections.abc import Iterable
@@ -303,6 +304,20 @@ def validate_result(result: dict[str, Any]) -> None:
         raise BundleValidationError("result provenance requires source_commit, commit, or git.sha")
 
     _model_ids(result)
+    _reject_nonfinite_score(result.get("score"), "result score")
+    _reject_nonfinite_score(result.get("partial_score"), "result partial_score")
+    model_scores = result.get("model_scores")
+    if isinstance(model_scores, list):
+        for entry in model_scores:
+            if isinstance(entry, dict):
+                _reject_nonfinite_score(entry.get("partial_score"), "model_scores partial_score")
+
+
+def _reject_nonfinite_score(value: Any, owner: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return
+    if not math.isfinite(value):
+        raise BundleValidationError(f"{owner} must be a finite number")
 
 
 _REKOR_ENTRY_KEYS = ("tlogEntries", "transparencyLogEntries", "rekor")
