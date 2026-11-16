@@ -462,6 +462,52 @@ class QueueApiTests(unittest.TestCase):
         status, _ = self._dispatch("POST", "/api/queue/claim", {}, token=registered["token"])
         self.assertEqual(status, 403)
 
+    def test_submit_rejects_foreign_run_id_and_never_overwrites(self) -> None:
+        token, runner_id = self._registered()
+        enqueue(self.root, {"model_id": "m", "run_id": "run-a", "queue_id": "job-a"})
+        enqueue(self.root, {"model_id": "m", "run_id": "run-b", "queue_id": "job-b"})
+
+        self.assertEqual(self._dispatch("POST", "/api/queue/claim", {}, token=token)[0], 200)
+        envelope = sign_result(_result("run-a"), self.private, runner_id)
+        self.assertEqual(
+            self._dispatch("POST", "/api/queue/job-a/submit", envelope, token=token)[0], 200
+        )
+
+        # job-b is claimed but the envelope names run-a: the replay is refused.
+        self.assertEqual(self._dispatch("POST", "/api/queue/claim", {}, token=token)[0], 200)
+        status, data = self._dispatch("POST", "/api/queue/job-b/submit", envelope, token=token)
+        self.assertEqual(status, 400)
+        assert data is not None
+        self.assertIn("run_id", data["error"])
+        pending = {job["queue_id"]: job["status"] for job in list_pending(self.root)}
+        self.assertEqual(pending, {"job-b": "CLAIMED"})
+        self.assertEqual(
+            sorted(p.name for p in (self.root / "submissions" / runner_id).iterdir()), ["run-a"]
+        )
+
+    def test_submit_never_replaces_a_stored_run(self) -> None:
+        token, runner_id = self._registered()
+        enqueue(self.root, {"model_id": "m", "run_id": "same-run", "queue_id": "job-1"})
+        enqueue(self.root, {"model_id": "m", "run_id": "same-run", "queue_id": "job-2"})
+        self.assertEqual(self._dispatch("POST", "/api/queue/claim", {}, token=token)[0], 200)
+        first = _result("same-run")
+        first["partial_score"] = 0.1
+        envelope = sign_result(first, self.private, runner_id)
+        self.assertEqual(
+            self._dispatch("POST", "/api/queue/job-1/submit", envelope, token=token)[0], 200
+        )
+
+        self.assertEqual(self._dispatch("POST", "/api/queue/claim", {}, token=token)[0], 200)
+        second = _result("same-run")
+        second["partial_score"] = 0.99
+        replay = sign_result(second, self.private, runner_id)
+        status, _ = self._dispatch("POST", "/api/queue/job-2/submit", replay, token=token)
+        self.assertEqual(status, 400)
+        stored = json.loads(
+            (self.root / "submissions" / runner_id / "same-run" / "result.json").read_text()
+        )
+        self.assertEqual(stored["partial_score"], 0.1)
+
 
 if __name__ == "__main__":
     unittest.main()
