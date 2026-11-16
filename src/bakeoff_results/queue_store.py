@@ -17,10 +17,12 @@ is the rename.
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import json
 import os
 import re
 import tempfile
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -139,6 +141,21 @@ def _completed_path(root: Path, queue_id: str) -> Path:
 def _lock_path(root: Path, queue_id: str, runner_id: str) -> Path:
     name = f"{_safe_id(queue_id, 'queue_id')}.lck-{_safe_id(runner_id, 'runner_id')}"
     return _under_root(root, pending_dir(root) / name)
+
+
+@contextlib.contextmanager
+def _job_lock(root: Path, queue_id: str) -> Iterator[None]:
+    """Serialise read-modify-write on one job so a late writer cannot resurrect it."""
+    path = _under_root(root, _queue_dir(root) / "locks" / f"{_safe_id(queue_id, 'queue_id')}.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        with contextlib.suppress(OSError):
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def _runners_dir(root: Path) -> Path:
@@ -309,6 +326,18 @@ def _lookup_pending(root: Path, job_id: str) -> tuple[Path, dict[str, Any]] | No
     return None
 
 
+@contextlib.contextmanager
+def _locked_pending(root: Path, job_id: str) -> Iterator[tuple[Path, dict[str, Any]] | None]:
+    """Re-resolve *job_id* under the job lock, so a concurrent writer is fully ordered."""
+    found = _lookup_pending(root, job_id)
+    if found is None:
+        yield None
+        return
+    queue_id = str(found[1].get("queue_id", found[0].stem))
+    with _job_lock(root, queue_id):
+        yield _lookup_pending(root, job_id)
+
+
 def claim(
     root: Path,
     runner_id: str,
@@ -387,20 +416,20 @@ def claim(
 
 
 def heartbeat(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
-    found = _lookup_pending(root, job_id)
-    if found is None:
-        raise QueueStoreError(f"unknown in-flight job: {job_id}")
-    path, data = found
-    if data.get("claimed_by") != runner_id:
-        raise QueueStoreError("job is not claimed by this runner")
-    if data.get("status") not in {STATUS_CLAIMED, STATUS_IN_PROGRESS}:
-        raise QueueStoreError(f"job {job_id} is not in-flight")
-    now_str = utc_now()
-    data["status"] = STATUS_IN_PROGRESS
-    data["last_heartbeat"] = now_str
-    data.setdefault("started_at", now_str)
-    data["updated_at"] = now_str
-    _atomic_write(root, path, data)
+    with _locked_pending(root, job_id) as found:
+        if found is None:
+            raise QueueStoreError(f"unknown in-flight job: {job_id}")
+        path, data = found
+        if data.get("claimed_by") != runner_id:
+            raise QueueStoreError("job is not claimed by this runner")
+        if data.get("status") not in {STATUS_CLAIMED, STATUS_IN_PROGRESS}:
+            raise QueueStoreError(f"job {job_id} is not in-flight")
+        now_str = utc_now()
+        data["status"] = STATUS_IN_PROGRESS
+        data["last_heartbeat"] = now_str
+        data.setdefault("started_at", now_str)
+        data["updated_at"] = now_str
+        _atomic_write(root, path, data)
     runner = get_runner(root, runner_id)
     if runner is not None:
         runner["last_heartbeat"] = now_str
@@ -410,20 +439,20 @@ def heartbeat(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
 
 
 def complete(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
-    found = _lookup_pending(root, job_id)
-    if found is None:
-        raise QueueStoreError(f"unknown in-flight job: {job_id}")
-    src, data = found
-    if data.get("claimed_by") != runner_id:
-        raise QueueStoreError("job is not claimed by this runner")
-    now_str = utc_now()
-    data["status"] = STATUS_COMPLETE
-    data["completed_at"] = now_str
-    data["updated_at"] = now_str
-    queue_id = str(data.get("queue_id", src.stem))
-    _atomic_write(root, _completed_path(root, queue_id), data)
-    with contextlib.suppress(FileNotFoundError):
-        src.unlink()
+    with _locked_pending(root, job_id) as found:
+        if found is None:
+            raise QueueStoreError(f"unknown in-flight job: {job_id}")
+        src, data = found
+        if data.get("claimed_by") != runner_id:
+            raise QueueStoreError("job is not claimed by this runner")
+        now_str = utc_now()
+        data["status"] = STATUS_COMPLETE
+        data["completed_at"] = now_str
+        data["updated_at"] = now_str
+        queue_id = str(data.get("queue_id", src.stem))
+        _atomic_write(root, _completed_path(root, queue_id), data)
+        with contextlib.suppress(FileNotFoundError):
+            src.unlink()
     runner = get_runner(root, runner_id)
     if runner is not None:
         _settle_status(runner, RUNNER_IDLE)
@@ -434,39 +463,39 @@ def complete(root: Path, job_id: str, runner_id: str) -> dict[str, Any]:
 
 
 def fail(root: Path, job_id: str, error: str, runner_id: str | None = None) -> dict[str, Any]:
-    found = _lookup_pending(root, job_id)
-    if found is None:
-        raise QueueStoreError(f"unknown in-flight job: {job_id}")
-    src, data = found
-    owner = data.get("claimed_by")
-    if runner_id is not None and owner != runner_id:
-        raise QueueStoreError("job is not claimed by this runner")
-    now_str = utc_now()
-    attempt = int(data.get("attempt_count", 0))
-    max_att = int(data.get("max_attempts", 5))
-    data["error_detail"] = error
+    with _locked_pending(root, job_id) as found:
+        if found is None:
+            raise QueueStoreError(f"unknown in-flight job: {job_id}")
+        src, data = found
+        owner = data.get("claimed_by")
+        if runner_id is not None and owner != runner_id:
+            raise QueueStoreError("job is not claimed by this runner")
+        now_str = utc_now()
+        attempt = int(data.get("attempt_count", 0))
+        max_att = int(data.get("max_attempts", 5))
+        data["error_detail"] = error
 
-    if attempt < max_att:
-        attempt += 1
-        data["attempt_count"] = attempt
-        data["status"] = STATUS_PENDING
-        data["claimed_by"] = None
-        data["claimed_at"] = None
-        data["started_at"] = None
-        data["last_heartbeat"] = None
-        retry_dt = _now_dt() + timedelta(minutes=_RETRY_BACKOFF_MINUTES * attempt)
-        data["retry_after"] = retry_dt.strftime(_ISO_FMT)
-        data["priority"] = int(data.get("priority", 100)) + _RETRY_PRIORITY_BUMP * attempt
-        data["updated_at"] = now_str
-        _atomic_write(root, src, data)
-    else:
-        data["status"] = STATUS_FAILED
-        data["completed_at"] = now_str
-        data["updated_at"] = now_str
-        queue_id = str(data.get("queue_id", src.stem))
-        _atomic_write(root, _completed_path(root, queue_id), data)
-        with contextlib.suppress(FileNotFoundError):
-            src.unlink()
+        if attempt < max_att:
+            attempt += 1
+            data["attempt_count"] = attempt
+            data["status"] = STATUS_PENDING
+            data["claimed_by"] = None
+            data["claimed_at"] = None
+            data["started_at"] = None
+            data["last_heartbeat"] = None
+            retry_dt = _now_dt() + timedelta(minutes=_RETRY_BACKOFF_MINUTES * attempt)
+            data["retry_after"] = retry_dt.strftime(_ISO_FMT)
+            data["priority"] = int(data.get("priority", 100)) + _RETRY_PRIORITY_BUMP * attempt
+            data["updated_at"] = now_str
+            _atomic_write(root, src, data)
+        else:
+            data["status"] = STATUS_FAILED
+            data["completed_at"] = now_str
+            data["updated_at"] = now_str
+            queue_id = str(data.get("queue_id", src.stem))
+            _atomic_write(root, _completed_path(root, queue_id), data)
+            with contextlib.suppress(FileNotFoundError):
+                src.unlink()
 
     if isinstance(owner, str):
         runner = get_runner(root, owner)
@@ -478,18 +507,20 @@ def fail(root: Path, job_id: str, error: str, runner_id: str | None = None) -> d
 
 
 def requeue(root: Path, job_id: str) -> dict[str, Any]:
-    found = _lookup_pending(root, job_id)
-    if found is not None:
-        src, data = found
-        runner_id = data.get("claimed_by")
-        data["status"] = STATUS_PENDING
-        data["claimed_by"] = None
-        data["claimed_at"] = None
-        data["started_at"] = None
-        data["last_heartbeat"] = None
-        data["retry_after"] = None
-        data["updated_at"] = utc_now()
-        _atomic_write(root, src, data)
+    if _lookup_pending(root, job_id) is not None:
+        with _locked_pending(root, job_id) as pending_job:
+            if pending_job is None:
+                raise QueueStoreError(f"unknown job: {job_id}")
+            src, data = pending_job
+            runner_id = data.get("claimed_by")
+            data["status"] = STATUS_PENDING
+            data["claimed_by"] = None
+            data["claimed_at"] = None
+            data["started_at"] = None
+            data["last_heartbeat"] = None
+            data["retry_after"] = None
+            data["updated_at"] = utc_now()
+            _atomic_write(root, src, data)
         if isinstance(runner_id, str):
             runner = get_runner(root, runner_id)
             if runner is not None and runner.get("current_claim") in {

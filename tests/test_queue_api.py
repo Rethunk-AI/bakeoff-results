@@ -9,10 +9,12 @@ import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from unittest import mock
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from bakeoff_results import queue_store
 from bakeoff_results.queue_app import QueueSettings, dispatch
 from bakeoff_results.queue_server import make_handler
 from bakeoff_results.queue_signing import generate_keypair, sign_result
@@ -20,9 +22,12 @@ from bakeoff_results.queue_store import (
     QueueStoreError,
     add_whitelist_key,
     claim,
+    complete,
     enqueue,
     fail,
     get_runner,
+    heartbeat,
+    list_completed,
     list_pending,
     reap_stale_claims,
     set_runner_status,
@@ -517,6 +522,51 @@ class QueueApiTests(unittest.TestCase):
         claimed = claim(self.root, "runner-1")
         assert claimed is not None
         self.assertEqual(claimed["model_id"], "model-A")
+
+    def test_late_heartbeat_cannot_undo_complete(self) -> None:
+        enqueue(self.root, {"model_id": "m", "run_id": "job-h", "queue_id": "job-h"})
+        claimed = claim(self.root, "runner-1")
+        assert claimed is not None
+        pending_path = self.root / "run_queue" / "pending" / "job-h.json"
+        in_write = threading.Event()
+        release = threading.Event()
+        real_write = queue_store._atomic_write
+
+        def stalling_write(root: Path, path: Path, data: dict[str, Any]) -> None:
+            if Path(path) == pending_path:
+                in_write.set()
+                self.assertTrue(release.wait(5))
+            real_write(root, path, data)
+
+        errors: list[BaseException] = []
+
+        def run(fn) -> None:
+            try:
+                fn()
+            except QueueStoreError:
+                pass
+            except Exception as exc:  # noqa: BLE001 - a thread's failure must fail the test
+                errors.append(exc)
+
+        with mock.patch.object(queue_store, "_atomic_write", stalling_write):
+            beat = threading.Thread(
+                target=run, args=(lambda: heartbeat(self.root, "job-h", "runner-1"),)
+            )
+            beat.start()
+            self.assertTrue(in_write.wait(5))
+            done = threading.Thread(
+                target=run, args=(lambda: complete(self.root, "job-h", "runner-1"),)
+            )
+            done.start()
+            # complete() must not finish while the heartbeat still holds the job lock.
+            done.join(0.5)
+            release.set()
+            beat.join(10)
+            done.join(10)
+
+        self.assertEqual(errors, [])
+        self.assertEqual([job["status"] for job in list_completed(self.root)], ["COMPLETE"])
+        self.assertEqual(list_pending(self.root), [])
 
 
 if __name__ == "__main__":
