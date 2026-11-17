@@ -327,6 +327,16 @@ class BundleValidationTests(unittest.TestCase):
             self.assertEqual(validated.result["run_id"], "run-001")
             self.assertEqual(validated.manifest["schema_version"], "bakeoff-results/v1")
 
+    def test_camelcase_schema_version_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = make_bundle(Path(tmp))
+            manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+            manifest["schemaVersion"] = manifest.pop("schema_version")
+            write_json(bundle / "manifest.json", manifest)
+
+            with self.assertRaisesRegex(BundleValidationError, "schema_version"):
+                validate_bundle(bundle)
+
     def test_tampered_hash_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bundle = make_bundle(Path(tmp))
@@ -379,6 +389,7 @@ class IndexBuilderTests(unittest.TestCase):
             self.assertEqual(len(payload["entries"]), 1)
             entry = payload["entries"][0]
             self.assertEqual(entry["run_id"], "run-001")
+            self.assertNotIn("outcome", entry)
             self.assertEqual(entry["model_ids"], ["model-a", "model-b"])
             self.assertEqual(entry["judge_mode"], "static-fixture")
             self.assertEqual(entry["config_hash"], "config-sha256")

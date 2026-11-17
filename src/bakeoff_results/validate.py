@@ -209,7 +209,7 @@ def sha256_file(path: Path) -> str:
 
 
 def _schema_version(manifest: dict[str, Any]) -> str | None:
-    value = manifest.get("schema_version", manifest.get("schemaVersion"))
+    value = manifest.get("schema_version")
     return str(value) if value is not None else None
 
 
