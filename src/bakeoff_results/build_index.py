@@ -189,14 +189,6 @@ def _state(result: dict[str, Any], manifest: dict[str, Any]) -> str | None:
     return None
 
 
-def _outcome(result: dict[str, Any]) -> str | None:
-    """Run outcome (e.g. completed/incomplete/failed) when the harness emits it."""
-    value = result.get("outcome")
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return None
-
-
 def _model_scores_list(result: dict[str, Any], manifest: dict[str, Any]) -> list[dict[str, Any]]:
     """Return per-model score entries from the current bundle schema.
 
@@ -340,7 +332,6 @@ def index_entry(bundle: ValidatedBundle) -> dict[str, Any]:
         or _nested_string(result, "config", "sha256"),
         "hardware": _hardware(result),
         "state": _state(result, bundle.manifest),
-        "outcome": _outcome(result),
         "failure_reason": _failure_reason(result, bundle.manifest),
         "score": _score(result, bundle.manifest),
         "model_scores_detail": _model_scores_detail(result, bundle.manifest),
