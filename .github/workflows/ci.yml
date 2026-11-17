@@ -162,7 +162,7 @@ jobs:
       - name: Fail if any check did not succeed
         run: |
           if [ "${{ needs.verify.result }}" != "success" ] \
-            || [ "${{ needs.publish.result }}" != "success" ]; then
+            || { [ "${{ needs.publish.result }}" != "success" ] && [ "${{ needs.publish.result }}" != "skipped" ]; }; then
             echo "verify=${{ needs.verify.result }} publish=${{ needs.publish.result }}"
             exit 1
           fi
