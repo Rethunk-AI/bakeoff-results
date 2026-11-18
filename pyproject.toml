@@ -33,6 +33,9 @@ target-version = "py312"
 [tool.ruff.lint]
 # python-pyproject-00004
 select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF", "S"]
+# python-pyproject-00005: the one rule the formatter owns; a project adds only by-design rules,
+# each with a comment saying why
+ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/bakeoff_results/queue_server.py" = ["N802"]
