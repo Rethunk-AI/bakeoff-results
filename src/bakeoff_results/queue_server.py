@@ -35,7 +35,7 @@ def build_settings(root: Path | None = None) -> QueueSettings:
 def make_handler(settings: QueueSettings) -> type[BaseHTTPRequestHandler]:
     class QueueHandler(BaseHTTPRequestHandler):
         def _headers(self) -> dict[str, str]:
-            return {key: value for key, value in self.headers.items()}
+            return dict(self.headers)
 
         def _body(self) -> bytes:
             length = int(self.headers.get("Content-Length", "0") or 0)

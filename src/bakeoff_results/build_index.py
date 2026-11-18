@@ -820,7 +820,7 @@ def render_html(payload: dict[str, Any]) -> str:
         <div class="slider-group">
           <div class="slider-header">
             <label>Total Params (B)</label>
-            <span id="params-range-lbl" class="slider-range-lbl">{params_labels[0]} – {params_labels[-1]}</span>
+            <span id="params-range-lbl" class="slider-range-lbl">{params_labels[0]} - {params_labels[-1]}</span>
           </div>
           <div class="dual-slider">
             <div class="dual-track" id="params-track"></div>
@@ -832,7 +832,7 @@ def render_html(payload: dict[str, Any]) -> str:
         <div class="slider-group">
           <div class="slider-header">
             <label>Context Length</label>
-            <span id="ctx-range-lbl" class="slider-range-lbl">4K – 128K+</span>
+            <span id="ctx-range-lbl" class="slider-range-lbl">4K - 128K+</span>
           </div>
           <div class="dual-slider">
             <div class="dual-track" id="ctx-track"></div>
@@ -844,7 +844,7 @@ def render_html(payload: dict[str, Any]) -> str:
         <div class="slider-group">
           <div class="slider-header">
             <label>VRAM (GB)</label>
-            <span id="vram-range-lbl" class="slider-range-lbl">0 GB – 40+ GB</span>
+            <span id="vram-range-lbl" class="slider-range-lbl">0 GB - 40+ GB</span>
           </div>
           <div class="dual-slider">
             <div class="dual-track" id="vram-track"></div>
@@ -960,11 +960,11 @@ def render_html(payload: dict[str, Any]) -> str:
 
     function updateSliderLabels() {{
       document.getElementById("params-range-lbl").textContent =
-        PARAMS_LABELS[sliderState.paramsMin] + " – " + PARAMS_LABELS[sliderState.paramsMax];
+        PARAMS_LABELS[sliderState.paramsMin] + " - " + PARAMS_LABELS[sliderState.paramsMax];
       document.getElementById("ctx-range-lbl").textContent =
-        CTX_LABELS[sliderState.ctxMin] + " – " + CTX_LABELS[sliderState.ctxMax];
+        CTX_LABELS[sliderState.ctxMin] + " - " + CTX_LABELS[sliderState.ctxMax];
       document.getElementById("vram-range-lbl").textContent =
-        VRAM_LABELS[sliderState.vramMin] + " – " + VRAM_LABELS[sliderState.vramMax];
+        VRAM_LABELS[sliderState.vramMin] + " - " + VRAM_LABELS[sliderState.vramMax];
       updateTrack(document.getElementById("params-track"),
         document.getElementById("params-min"), document.getElementById("params-max"));
       updateTrack(document.getElementById("ctx-track"),
@@ -1089,7 +1089,7 @@ def render_html(payload: dict[str, Any]) -> str:
     function updateFilterBtn(id, mode) {{
       const btn = document.querySelector('.filter-add-btn[data-target="' + id + '"]');
       if (!btn) return;
-      if (mode === "multi") {{ btn.textContent = "×"; btn.title = "Remove multi-select"; }}
+      if (mode === "multi") {{ btn.textContent = "x"; btn.title = "Remove multi-select"; }}
       else {{ btn.textContent = "+"; btn.title = "Add value (multi-select)"; }}
     }}
 
@@ -1527,7 +1527,7 @@ def render_html(payload: dict[str, Any]) -> str:
         chip.appendChild(val);
         const clearBtn = document.createElement("button");
         clearBtn.className = "filter-chip-clear";
-        clearBtn.textContent = "×";
+        clearBtn.textContent = "x";
         clearBtn.title = "Clear " + FILTER_LABELS[id];
         clearBtn.addEventListener("click", () => {{
           if (filterMode[id] === "multi") {{
@@ -1554,7 +1554,7 @@ def render_html(payload: dict[str, Any]) -> str:
         chip.appendChild(val);
         const clearBtn = document.createElement("button");
         clearBtn.className = "filter-chip-clear";
-        clearBtn.textContent = "×";
+        clearBtn.textContent = "x";
         clearBtn.title = "Clear " + label;
         clearBtn.addEventListener("click", clearFn);
         chip.appendChild(clearBtn);
@@ -1564,7 +1564,7 @@ def render_html(payload: dict[str, Any]) -> str:
       if (sliderState.paramsMin !== 0 || sliderState.paramsMax !== PARAMS_SNAPS.length - 1) {{
         filterChipStrip.appendChild(makeRangeChip(
           "Total Params (B)",
-          PARAMS_LABELS[sliderState.paramsMin] + " – " + PARAMS_LABELS[sliderState.paramsMax],
+          PARAMS_LABELS[sliderState.paramsMin] + " - " + PARAMS_LABELS[sliderState.paramsMax],
           () => {{
             document.getElementById("params-min").value = 0;
             document.getElementById("params-max").value = PARAMS_SNAPS.length - 1;
@@ -1576,7 +1576,7 @@ def render_html(payload: dict[str, Any]) -> str:
       if (sliderState.ctxMin !== 0 || sliderState.ctxMax !== CTX_SNAPS.length - 1) {{
         filterChipStrip.appendChild(makeRangeChip(
           "Context Length",
-          CTX_LABELS[sliderState.ctxMin] + " – " + CTX_LABELS[sliderState.ctxMax],
+          CTX_LABELS[sliderState.ctxMin] + " - " + CTX_LABELS[sliderState.ctxMax],
           () => {{
             document.getElementById("ctx-min").value = 0;
             document.getElementById("ctx-max").value = CTX_SNAPS.length - 1;
@@ -1588,7 +1588,7 @@ def render_html(payload: dict[str, Any]) -> str:
       if (sliderState.vramMin !== 0 || sliderState.vramMax !== VRAM_SNAPS.length - 1) {{
         filterChipStrip.appendChild(makeRangeChip(
           "VRAM (GB)",
-          VRAM_LABELS[sliderState.vramMin] + " – " + VRAM_LABELS[sliderState.vramMax],
+          VRAM_LABELS[sliderState.vramMin] + " - " + VRAM_LABELS[sliderState.vramMax],
           () => {{
             document.getElementById("vram-min").value = 0;
             document.getElementById("vram-max").value = VRAM_SNAPS.length - 1;

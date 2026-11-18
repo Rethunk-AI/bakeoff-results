@@ -40,7 +40,14 @@ select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF", "S"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
+# HTTP handler methods are named do_GET/do_POST by BaseHTTPRequestHandler
 "src/bakeoff_results/queue_server.py" = ["N802"]
+# git argv is a fixed local tool invocation; the HTML f-string is not SQL
+"src/bakeoff_results/build_index.py" = ["S603", "S607", "S608"]
+# git argv is a fixed local tool invocation, not untrusted input
+"src/bakeoff_results/signers_commit.py" = ["S603", "S607"]
+# pytest asserts; fixture tokens and /tmp path-injection cases; local urlopen and git in tests
+"tests/*.py" = ["S101", "S106", "S108", "S310", "S603", "S607"]
 
 [tool.deptry]
 known_first_party = ["bakeoff_results"]

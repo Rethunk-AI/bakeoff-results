@@ -84,7 +84,7 @@ def runner_id_for_key(public_key: str) -> str:
 
 
 def _normalize_headers(headers: dict[str, str]) -> dict[str, str]:
-    return {key: value for key, value in headers.items()}
+    return dict(headers)
 
 
 def _require_runner(settings: QueueSettings, headers: dict[str, str]) -> str:
