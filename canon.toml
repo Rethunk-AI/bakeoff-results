@@ -1,0 +1,2 @@
+[deviations]
+"patterns-repo-settings-00001" = "this repository holds Python, not Go; jobs.analyze.strategy.matrix names actions and python so CodeQL covers every language here instead of the Go artifact"
