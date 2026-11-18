@@ -561,7 +561,7 @@ class QueueApiTests(unittest.TestCase):
                 fn()
             except QueueStoreError:
                 pass
-            except Exception as exc:  # noqa: BLE001 - a thread's failure must fail the test
+            except Exception as exc:  # a thread's failure must fail the test
                 errors.append(exc)
 
         with mock.patch.object(queue_store, "_atomic_write", stalling_write):
