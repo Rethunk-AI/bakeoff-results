@@ -20,7 +20,7 @@ where = ["src"]
 
 # Pin dev tools explicitly so local checks match CI regardless of ambient installs.
 [dependency-groups]
-dev = ["pytest>=8.2", "ruff>=0.5", "pyrefly>=0.1", "deptry>=0.20"]
+dev = ["pytest>=8.2", "ruff>=0.5", "pyrefly>=0.1", "deptry"]
 
 [tool.pyrefly]
 project-includes = ["src", "tests"]
