@@ -25,6 +25,8 @@ dev = ["pytest>=8.2", "ruff>=0.5", "pyrefly>=0.1", "deptry>=0.20"]
 [tool.pyrefly]
 project-includes = ["src", "tests"]
 search-path = ["src"]
+# python-pyproject-00008
+check-unannotated-defs = true
 
 [tool.ruff]
 line-length = 100
