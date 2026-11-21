@@ -1,2 +1,36 @@
 [gates.deps]
 run = "uv run deptry ."
+
+# The CI-only steps of the verify job, in CI's order.
+[gates.signers-commit]
+timeout = "1m"
+run = "PYTHONPATH=src uv run python -m bakeoff_results.signers_commit"
+
+[gates.compileall]
+run = "uv run python -m compileall -q src tests"
+
+[gates.validate]
+timeout = "2m"
+run = "PYTHONPATH=src uv run python -m bakeoff_results.validate --scan --allow-empty --require-signature submissions"
+
+# Every submitted signature.sigstore.json must verify against the trusted signing identity;
+# vacuously passes when no submission carries a bundle.
+[gates.sigstore]
+timeout = "5m"
+run = '''
+failed=0
+while IFS= read -r bundle; do
+  dir="$(dirname "$bundle")"
+  signed="$dir/$(jq -r '.signature.signed_file // "result.json"' "$dir/manifest.json" 2>/dev/null || echo result.json)"
+  if [ ! -f "$signed" ]; then echo "FAIL: signed file not found at $signed"; failed=1; continue; fi
+  cosign verify-blob --bundle "$bundle" \
+    --certificate-identity "repo:Rethunk-AI/bakeoff:ref:refs/heads/main" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    "$signed" || failed=1
+done < <(find submissions -name "signature.sigstore.json")
+exit "$failed"
+'''
+
+[gates.build-index]
+timeout = "2m"
+run = 'PYTHONPATH=src uv run python -m bakeoff_results.build_index --submissions submissions --site "$(mktemp -d)"'
