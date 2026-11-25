@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  # A rerun cannot redeploy Pages (its attempt adds a second github-pages artifact); a dispatched run can.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -114,7 +116,7 @@ jobs:
 
   publish:
     needs: verify
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
